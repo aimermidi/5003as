@@ -25,12 +25,196 @@ plot(cars)
 ---
 
 # Data Cleaning & Feature Engineering
+1. Price Column Processing & Outlier Detection
+This R code finds the price column, cleans its data by removing non-numeric characters, converts it to a numeric type, and removes any rows where the price is 0 or less. It then performs an outlier analysis based on the IQR method.
+```{r}
+library(tidyr)
+# Re-read the cleaned data from the previous step
+df <- read_csv("listings.csv", col_types = cols(.default = "c"))
 
-- 缺失值处理
-- 异常值检测与处理
-- 特征构造与选择
-- 数据类型转换
+# Step 1: Find the price column
+price_col <- NULL
+possible_cols <- names(df)
 
+# Check for 'price' (case-insensitive)
+price_col <- possible_cols[str_detect(tolower(possible_cols), "price")][1]
+if (is.na(price_col)) {
+  # If not found, check for other keywords
+  price_keywords <- c('cost', 'amount', 'value', 'fee', 'charge', 'payment')
+  for (keyword in price_keywords) {
+    found_col <- possible_cols[str_detect(tolower(possible_cols), keyword)][1]
+    if (!is.na(found_col)) {
+      price_col <- found_col
+      break
+    }
+  }
+}
+
+if (is.na(price_col)) {
+  stop("Error: Could not find a column representing price.")
+}
+
+message(paste0("Using '", price_col, "' as the price column."))
+
+# Step 2: Clean and convert the price column (corrected)
+df <- df %>%
+  mutate(
+    # Remove commas and non-numeric characters, then convert to numeric.
+    # `as.numeric` will correctly convert invalid values to `NA`.
+    !!sym(price_col) := as.numeric(str_remove_all(str_remove_all(tolower(!!sym(price_col)), ","), "[^\\d.-]"))
+  ) %>%
+  # Now, filter out rows where the price is NA or <= 0
+  filter(!is.na(!!sym(price_col)) & !!sym(price_col) > 0)
+
+message(paste0("Effective price data rows: ", nrow(df)))
+
+# Step 3: Analyze outliers using IQR (will now work correctly)
+q1 <- quantile(df[[price_col]], 0.25)
+q3 <- quantile(df[[price_col]], 0.75)
+iqr <- q3 - q1
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+outliers <- df %>% filter(!!sym(price_col) < lower_bound | !!sym(price_col) > upper_bound)
+
+message("\nOutlier Analysis:")
+message(paste0("Interquartile Range (IQR): ", round(iqr, 2)))
+message(paste0("Outlier Lower Bound: ", round(lower_bound, 2)))
+message(paste0("Outlier Upper Bound: ", round(upper_bound, 2)))
+message(paste0("Number of outliers: ", nrow(outliers), " (", round(nrow(outliers) / nrow(df) * 100, 2), "% of data)"))
+
+# Step 4: Save the further cleaned data
+write_csv(df, "cleaned_data.csv")
+message("\nUpdated 'cleaned_data.csv' saved with prices > 0.")
+
+```
+2. Feature Engineering: Price Categorization
+This section adds a new categorical column, price_class, to the dataset based on the price value. This new feature can be useful for further analysis or machine learning models.
+```{r}
+# Re-read the cleaned data from the previous step
+df <- read_csv("cleaned_data.csv", col_types = cols(.default = "c"))
+
+# Find the price column again
+price_col <- names(df)[str_detect(tolower(names(df)), "price")][1]
+
+# Check if the price column was found
+if (is.na(price_col)) {
+  stop("Error: Could not find a column representing price.")
+}
+
+message(paste0("Using '", price_col, "' as the price column."))
+
+# Step 1: Ensure the price column is numeric before creating 'price_class'
+# This is a crucial step to prevent errors
+df <- df %>%
+  mutate(
+    # Safely convert the price column to numeric,
+    # invalid parsing will result in NA
+    price_numeric = as.numeric(!!sym(price_col)),
+    
+    # Create the new 'price_class' column based on the numeric price
+    price_class = case_when(
+      is.na(price_numeric) | price_numeric <= 0 ~ "Invalid Price",
+      price_numeric < 150 ~ "[0,150)",
+      price_numeric < 300 ~ "[150,300)",
+      TRUE ~ "[300,+)"
+    )
+  )
+
+# Step 2: Reorder columns to place 'price_class' at the beginning
+df <- df %>%
+  select(price_class, everything(), -price_numeric)
+
+# Step 3: Save the data with the new column
+write_csv(df, "cleaned_data_with_price_class.csv")
+message("\nFile saved to 'cleaned_data_with_price_class.csv' with new 'price_class' column.")
+
+```
+4. Missing Value Imputation
+This R code block replicates the final data cleaning step, which involves imputing missing values with specific placeholders (-1 for numeric columns and 'NA' for non-numeric columns). It also includes a function to calculate the "missing rate" based on these placeholders.
+```{r}
+# Load necessary libraries
+# You might need to install these packages first: install.packages("tidyverse")
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+# Re-read the data
+# suppressWarnings is added here as `read_csv` might generate warnings
+df <- suppressWarnings(read_csv("cleaned_data_with_price_class.csv", col_types = cols(.default = "c")))
+
+# Step 1: Identify numeric and non-numeric columns using the Python logic
+numeric_cols <- character(0)
+non_numeric_cols <- character(0)
+
+for (col in names(df)) {
+  sample <- df[[col]][!is.na(df[[col]]) & df[[col]] != "NA"][1:100]
+  if (length(sample) > 0) {
+    # suppressWarnings is used here to hide the 'NAs introduced by coercion' warnings
+    numeric_count <- suppressWarnings(sum(!is.na(as.numeric(sample))))
+    if (numeric_count / length(sample) > 0.8) {
+      numeric_cols <- c(numeric_cols, col)
+    } else {
+      non_numeric_cols <- c(non_numeric_cols, col)
+    }
+  } else {
+    non_numeric_cols <- c(non_numeric_cols, col)
+  }
+}
+
+# Step 2: Impute missing values
+df_imputed <- df %>%
+  mutate(
+    # Impute NA in numeric columns with -1
+    across(all_of(numeric_cols), ~replace_na(as.numeric(.x), -1)),
+    # Impute NA in non-numeric columns with 'NA'
+    across(all_of(non_numeric_cols), ~replace_na(.x, 'NA'))
+  )
+
+# Step 3: Save the final cleaned data
+write_csv(df_imputed, "cleaned_data_with_price_class_no_na.csv")
+message("\nFinal cleaned data saved to 'cleaned_data_with_price_class_no_na.csv'.")
+message(paste0("Found ", length(numeric_cols), " numeric columns."))
+message(paste0("Found ", length(non_numeric_cols), " non-numeric columns."))
+
+# Step 4: Create a function to calculate missing rates
+calculate_missing_rates <- function(data) {
+  missing_rates <- sapply(names(data), function(col) {
+    # Check for -1 in columns that have been correctly converted to numeric
+    if (is.numeric(data[[col]])) {
+      sum(data[[col]] == -1) / nrow(data)
+    } else {
+      # Check for 'NA' or '-1' in non-numeric columns
+      sum(data[[col]] %in% c('NA', '-1')) / nrow(data)
+    }
+  })
+  sort(missing_rates * 100, decreasing = TRUE)
+}
+
+missing_rates <- calculate_missing_rates(df_imputed)
+message("\nMissing rates per column (high to low):")
+print(missing_rates)
+```
+Following this, I swapped the positions of the `id` and `price_class` columns. Then, I performed further manual data cleaning in Excel:
+
+1.  I atomicized the `host_location` column, making the values as granular and indivisible as possible.
+2.  I filtered and removed rows where column data was misaligned. I also deleted columns that were not very useful for Exploratory Data Analysis (EDA), including but not limited to:
+    * `listing_url`
+    * `scrape_id`
+    * `description`
+    * `neighborhood_overview`
+    * `picture_url`
+    * `host_id`
+    * `host_url`
+    * `host_name`
+    * `host_about`
+    * `host_thumbnail_url`
+    * `host_picture_url`
+    * `neighbourhood_group_cleansed`
+    * `calendar_updated`
+
+These features were removed either because they had little analytical value or because their missing data rate was close to 100%.
 
 # Exploratory Data Analysis (EDA)
 初步 EDA : 变量之间的关系
