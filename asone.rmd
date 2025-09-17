@@ -30,3 +30,11 @@ plot(cars)
 - 异常值检测与处理
 - 特征构造与选择
 - 数据类型转换
+
+
+# Exploratory Data Analysis (EDA)
+初步 EDA : 变量之间的关系
+
+可视化结果（直方图、散点图、箱线图等）
+
+# Project Plan Summary
