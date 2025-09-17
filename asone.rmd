@@ -1,0 +1,32 @@
+---
+title: "Project Title"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Problem Definition
+
+简要描述你要解决的问题，包括背景、目标和预期成果。
+
+---
+
+# Data Description
+
+- 数据来源
+- 数据集结构（字段、类型、样本量等）
+- 主要变量说明
+
+```{r}
+# 这是 R 代码，可以直接运行 测试
+summary(cars)
+plot(cars)
+```
+---
+
+# Data Cleaning & Feature Engineering
+
+- 缺失值处理
+- 异常值检测与处理
+- 特征构造与选择
+- 数据类型转换
