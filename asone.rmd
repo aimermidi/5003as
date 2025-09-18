@@ -130,7 +130,7 @@ write_csv(df, "cleaned_data_with_price_class.csv")
 message("\nFile saved to 'cleaned_data_with_price_class.csv' with new 'price_class' column.")
 
 ```
-4. Missing Value Imputation
+3. Missing Value Imputation
 This R code block replicates the final data cleaning step, which involves imputing missing values with specific placeholders (-1 for numeric columns and 'NA' for non-numeric columns). It also includes a function to calculate the "missing rate" based on these placeholders.
 ```{r}
 # Load necessary libraries
