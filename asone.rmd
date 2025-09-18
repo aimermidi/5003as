@@ -218,7 +218,468 @@ These features were removed either because they had little analytical value or b
 
 # Exploratory Data Analysis (EDA)
 初步 EDA : 变量之间的关系
+1. setup and install
 
-可视化结果（直方图、散点图、箱线图等）
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(forcats)
+library(tidyverse)
+library(scales)
+library(car)
+library(vcd)
+library(corrplot)
+library(tidyr)
+library(gridExtra)
+library(caret)
+library(RColorBrewer)
+conflict_prefer("filter", "dplyr")
+conflict_prefer("lag", "dplyr")
+```
+
+
+
+1. 读取数据
+```{r}
+df <- read_csv("cleaned_data_with_price_class_no_dislocation.csv") # 不是运行上面代码所得到的文件，github上的数据清理后的csv
+```
+
+2 . price_calss 分布图 - Barplot
+```{r}
+
+# 2. 数据检查
+cat("\nPrice Class的唯一值:\n")
+unique(df$price_class)
+
+# 3. price_calss的统计分布表格
+# 自定义期望的顺序（不自定义则显示为[150,300)，[0,150)，[300,+)）
+desired_order <- c("[0,150)", "[150,300)", "[300,+)")
+
+# 在统计时转换为因子
+price_dist <- df %>%  
+    count(price_class, name = "count") %>%  
+    mutate(percentage = round(count / sum(count) * 100, 2),  
+           cumulative_percent = cumsum(percentage),
+           # 转换为因子并指定顺序
+           price_class = factor(price_class, levels = desired_order)) %>%  
+    arrange(price_class)  # 按因子顺序排列
+print(price_dist)
+
+# 4. 可视化 price_calss 分布
+ggplot(price_dist, aes(x = factor(price_class, levels = desired_order), 
+                       y = count, 
+                       fill = price_class)) +
+geom_col() +
+geom_text(aes(label = paste0(count, "\n(", percentage, "%)")), 
+          vjust = -0.3, 
+          size = 3.5) +
+scale_fill_brewer(palette = "Pastel1") +
+labs(title = "价格区间分布",
+     x = "价格区间",
+     y = "数量") +
+theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none",
+        plot.margin = margin(10, 10, 10, 10, "pt")) +
+  ylim(0, max(price_dist$count) * 1.2)
+```
+
+
+3. 如何选择具有意义分类特征与目标变量pirce class进行EDA
+3.1 每个分类特征与price_class的关联强度
+```{r}
+# 自定义函数：判断是否为分类特征
+is_categorical <- function(x) {
+  n_unique <- length(unique(na.omit(x)))
+  return(n_unique > 1 & n_unique < 100) #唯一值数量少于100个的特征
+}
+
+# 选择所有符合条件的分类特征
+categorical_features <- df %>%
+  select(where(is.character), where(is.factor), where(is.logical)) %>%
+  select(where(is_categorical)) %>%
+  select(-price_class)  #%>% # 排除目标变量
+  #select(-bathrooms_text) %>%# 排除数值变量bathrooms的文字版本
+  #select(-property_type) # 排除与分类变量room_type 高度相关的property_type
+
+# 计算每个分类特征与price_class的关联强度（Cramér's V）
+calculate_cramers_v <- function(x, y) {
+  # 确保都是因子
+  x <- as.factor(x)
+  y <- as.factor(y)
+  
+  # 创建列联表
+  cont_table <- table(x, y)
+  
+  # 计算卡方检验
+  chi2 <- chisq.test(cont_table)
+  n <- sum(cont_table)
+  k <- min(nrow(cont_table), ncol(cont_table))
+  
+  # 计算Cramér's V
+  cramers_v <- sqrt(chi2$statistic / (n * (k - 1)))
+  return(as.numeric(cramers_v))
+}
+
+# 计算所有分类特征的Cramér's V
+feature_importance <- map_dbl(categorical_features, 
+                             ~ calculate_cramers_v(., df$price_class)) %>%
+  enframe(name = "feature", value = "cramers_v") %>%
+  arrange(desc(cramers_v)) %>%
+  head(20)  # 选择关联性最强的20个特征
+
+cat("与price_class关联性最强的20个分类特征:\n")
+print(feature_importance)
+
+# 获取最重要的特征名
+top_features <- feature_importance$feature
+```
+
+3.2 property_type与room_type的Cramer's V：0.910  - 高度相关
+#install.packages('vcd')
+```{r}
+
+# 计算两个分类变量间的克莱姆V系数
+calculate_cramers_v <- function(var1, var2) {
+  table_data <- table(var1, var2)
+  return(assocstats(table_data)$cramer)
+}
+result <- calculate_cramers_v(df$room_type, df$property_type)
+print("property_type与room_type的Cramer's V：")
+print(result)
+```
+
+又因为property_type与room_type高度相关(Cramer's V > 0.5): 0.910，只选其一.
+bathrooms_text是数值特征bathrooms的文字版本，故不选。
+最终综合业务相关性与目标变量的相关性（0.405728435）考虑，选择room_type与目标变量price——class进行EDA。
+
+
+4. room_type vs price_class 可视化
+```{r}
+# 1. 可视化 Percentage distribution
+plot_stacked_percentage <- function(df, categorical_features, target_var = "price_class") {
+  df %>%
+    count(!!sym(categorical_features), !!sym(target_var)) %>%
+    group_by(!!sym(categorical_features)) %>%
+    mutate(percentage = n / sum(n) * 100) %>%
+    
+    ggplot(aes(x = !!sym(categorical_features), y = percentage, fill = !!sym(target_var))) +
+    geom_bar(stat = "identity", position = "stack") +
+    geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+              position = position_stack(vjust = 0.5), size = 3) +
+    coord_flip() +
+    scale_fill_brewer(palette = "Set3") +
+    labs(title = paste("Price Class Distribution by", categorical_features),
+         x = categorical_features, y = "Percentage") +
+    theme_minimal()
+}
+
+# 使用示例
+plot_stacked_percentage(df, "room_type")
+
+```
+
+
+5.如何选择具有意义的数值特征与目标变量pirce class进行EDA
+5.1 与price_class相关性最高的15个
+因为数值特征太多了，现在需要只对目标变量price class最具有分析意义的15个数值特征。然后画数值特征相关性热力图
+#install.packages("corrplot")
+#install.packages("reshape2")
+```{r}
+# 首先将price_class转换为有序数值变量用于相关性计算
+df <- df %>% #新增一列：price_class_numeric（数值型的价格类别）
+  mutate(price_class_numeric = case_when(
+    price_class == "[0,150)" ~ 1,
+    price_class == "[150,300)" ~ 2,
+    price_class == "[300,+)" ~ 3,
+    TRUE ~ NA_real_
+  ))
+
+# 选择所有数值型特征
+numeric_features <- df %>%
+  select(where(is.numeric)) %>%
+  select(-price_class_numeric) %>% # 排除我们创建的目标变量数值版本
+  select(-price) 
+
+# 计算每个数值特征与目标变量的相关性
+target_correlations <- numeric_features %>%
+  map_dbl(~ cor(., df$price_class_numeric, use = "complete.obs")) %>%
+  abs() %>%  # 取绝对值，关注相关性强度而非方向
+  sort(decreasing = TRUE) %>%
+  head(15)   # 选择相关性最高的15个特征
+
+
+# 获取这10个特征的名字
+selected_features <- names(target_correlations)
+# 计算这些特征之间的相关系数矩阵
+cor_matrix <- cor(numeric_features[selected_features], use = "complete.obs")
+# 按与目标变量的相关性强度排序特征
+feature_order <- names(sort(target_correlations, decreasing = TRUE))
+# 重新排序相关系数矩阵
+cor_matrix_ordered <- cor_matrix[feature_order, feature_order]
+
+
+cat("与price_class相关性最高的15个数值特征:\n")
+print(target_correlations)
+
+```
+
+与price_class相关性最高的4个数值特征:accommodates,bedrooms,beds,bathrooms 
+
+
+5.2 代码计算这四个变量之间的相关系数 - 检查共线性
+
+其实结合7.数值特征相关系数热力图可以明显看出：这4个数值特征之间的Pearson相关系数>0.6 - 存在共线性
+
+accommodates-bedrooms:0.871,bedrooms-beds:0.7880134,
+bedrooms-bathrooms:0.6955613,accommodates-bathrooms:0.6608256	
+
+```{r}
+# 定义要分析的多对变量
+variable_pairs <- list(
+  c("accommodates", "bedrooms"),
+  c("accommodates", "bathrooms"),
+  c("accommodates", "beds"),
+  c("bedrooms", "beds"),
+  c("bedrooms", "bathrooms"),
+  c("beds", "bathrooms")
+
+)
+
+# 计算每对变量的相关系数
+calculate_multiple_correlations <- function(df, pairs_list) {
+  results <- data.frame()
+  
+  for(pair in pairs_list) {
+    if(all(pair %in% names(df))) {
+      cor_value <- cor(df[[pair[1]]], df[[pair[2]]], 
+                      method = "pearson", use = "complete.obs")
+      results <- rbind(results, data.frame(
+        Variable1 = pair[1],
+        Variable2 = pair[2],
+        Correlation = cor_value,
+        Absolute_Correlation = abs(cor_value)
+      ))
+    }
+  }
+  
+  return(results[order(results$Absolute_Correlation, decreasing = TRUE), ])
+}
+
+# 使用示例
+multiple_cor_results <- calculate_multiple_correlations(df, variable_pairs)
+print("多对变量的相关系数:")
+print(multiple_cor_results)
+
+```
+
+
+最终综合业务相关性与目标变量的相关性（0.571）考虑，选择accommodates（该房源最多可容纳的客人数量）与目标变量price_class进行EDA。
+
+6. 选择accommodates vs price_class 可视化
+accommodates 代表：该房源最多可容纳的客人数量
+# 箱线图
+```{r}
+# 箱线图
+optimized_boxplot <- function(df) {
+  # 计算每个价格等级的样本量
+  sample_sizes <- df %>%
+    group_by(price_class) %>%
+    summarise(n = n()) %>%
+    mutate(label = paste0("n=", n))
+  
+  ggplot(df, aes(x = price_class, y = accommodates, fill = price_class)) +
+    geom_boxplot(
+      alpha = 0.8,
+      outlier.color = "red",
+      outlier.shape = 16,
+      outlier.size = 2,
+      notch = FALSE  # 添加缺口显示中位数的置信区间
+    ) +
+    # 添加样本量标签
+    geom_text(data = sample_sizes, 
+              aes(x = price_class, y = max(df$accommodates, na.rm = TRUE) * 1.05, 
+                  label = label),
+              size = 3.5, color = "darkblue") +
+    # 添加均值点
+    stat_summary(
+      fun = mean,
+      geom = "point",
+      shape = 18,
+      size = 3,
+      color = "red",
+      fill = "red"
+    ) +
+    scale_fill_brewer(palette = "Pastel1", name = "价格等级") +
+    labs(
+      title = "不同价格等级的房源容纳人数分布",
+      subtitle = "箱线图显示中位数、四分位数和异常值\n红色菱形表示均值，顶部显示样本量",
+      x = "价格等级",
+      y = "最多容纳人数",
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(face = "bold", size = 14),
+      plot.subtitle = element_text(color = "gray40", size = 10),
+      axis.text.x = element_text(angle = 0, hjust = 0.5)
+    ) +
+    # 添加网格线以便更好地阅读
+    theme(panel.grid.major = element_line(color = "gray90"),
+          panel.grid.minor = element_blank())
+}
+
+# 使用示例
+optimized_boxplot(df)
+```
+
+
+# 生成详细的分析报告
+```{r}
+# 生成详细的分析报告
+generate_accommodates_report <- function(df) {
+  cat("=== accommodates 与 price_class 关系分析报告 ===\n\n")
+  
+  # 基本统计
+  overall_stats <- df %>%
+    summarise(
+      Mean = mean(accommodates, na.rm = TRUE),
+      Median = median(accommodates, na.rm = TRUE),
+      SD = sd(accommodates, na.rm = TRUE),
+      Min = min(accommodates, na.rm = TRUE),
+      Max = max(accommodates, na.rm = TRUE)
+    )
+  
+  cat("整体容纳人数统计:\n")
+  print(overall_stats)
+  cat("\n")
+  
+  # 按价格等级分组统计
+  group_stats <- df %>%
+    group_by(price_class) %>%
+    summarise(
+      Count = n(),
+      Mean = mean(accommodates, na.rm = TRUE),
+      Median = median(accommodates, na.rm = TRUE),
+      SD = sd(accommodates, na.rm = TRUE)
+    )
+  
+  cat("按价格等级分组的容纳人数统计:\n")
+  print(group_stats)
+  cat("\n")
+  
+  # 统计检验
+  anova_p <- summary(aov(accommodates ~ price_class, data = df))[[1]]$"Pr(>F)"[1]
+  cat("方差分析 p值:", format.pval(anova_p), "\n")
+  
+  if(anova_p < 0.05) {
+    cat("✅ 结论: 不同价格等级的容纳人数存在显著差异\n")
+  } else {
+    cat("❌ 结论: 不同价格等级的容纳人数无显著差异\n")
+  }
+  
+  # 业务洞察
+  cat("\n=== 业务洞察 ===\n")
+  max_mean_class <- group_stats$price_class[which.max(group_stats$Mean)]
+  min_mean_class <- group_stats$price_class[which.min(group_stats$Mean)]
+  cat("- 平均容纳人数最高的价格等级:", max_mean_class, "\n")
+  cat("- 平均容纳人数最低的价格等级:", min_mean_class, "\n")
+  cat("- 容纳人数范围:", min(df$accommodates), "-", max(df$accommodates), "人\n")
+}
+
+# 使用示例
+generate_accommodates_report(df)
+```
+
+
+
+7. 数值特征相关系数热力图
+```{r}
+
+# 计算与price_class相关性最高的15个特征特征之间的相关系数矩阵
+cor_matrix <- cor(numeric_features[selected_features], use = "complete.obs")
+
+# 带数值显示的热力图
+par(mar = c(0, 0, 0, 0) + 0.1) 
+corrplot(cor_matrix,
+         method = "square",
+         type = "upper",
+         tl.cex = 0.6,
+         tl.col = "darkblue",
+         tl.srt = 45,
+         addCoef.col = "black",
+         number.cex = 0.4,
+         cex.main = 1.2,
+         col = colorRampPalette(c("blue", "white", "red"))(100))
+title("数值特征相关系数热力图", 
+      line = -2,  # 负值将标题移到图内
+      adj = 0,    # 左对齐
+      cex.main = 1.2)
+
+```
+
+8. 检查类别不平衡（房型 / 价格类别）
+
+
+```{r}
+
+# 设置中文字体支持（如果需要）
+ par(family = "SimHei")
+
+room_type_counts <- df %>%
+  count(room_type) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+price_class_counts <- df %>%
+  count(price_class) %>%
+  mutate(percentage = n / sum(n) * 100)
+# 类别不平衡评估
+
+cat("类别不平衡评估\n")
+
+# 计算不平衡比率
+imbalance_ratio_room <- max(room_type_counts$n) / min(room_type_counts$n)
+imbalance_ratio_price <- max(price_class_counts$n) / min(price_class_counts$n)
+
+cat(sprintf("房型最大/最小类别比: %.2f\n", imbalance_ratio_room))
+cat(sprintf("价格类别最大/最小类别比: %.2f\n", imbalance_ratio_price))
+
+# 评估标准
+cat("\n类别不平衡评估标准:\n")
+cat("- 比率 < 2: 基本平衡\n")
+cat("- 比率 2-5: 轻度不平衡\n")
+cat("- 比率 5-10: 中度不平衡\n")
+cat("- 比率 > 10: 严重不平衡\n")
+
+if (imbalance_ratio_room > 10) {
+  cat("房型存在严重类别不平衡！\n")
+} else if (imbalance_ratio_room > 5) {
+  cat("房型存在中度类别不平衡\n")
+} else if (imbalance_ratio_room > 2) {
+  cat("房型存在轻度类别不平衡\n")
+} else {
+  cat("房型类别分布基本平衡\n")
+}
+
+if (imbalance_ratio_price > 10) {
+  cat("价格类别存在严重类别不平衡！\n")
+} else if (imbalance_ratio_price > 5) {
+  cat("价格类别存在中度类别不平衡\n")
+} else if (imbalance_ratio_price > 2) {
+  cat("价格类别存在轻度类别不平衡\n")
+} else {
+  cat("价格类别分布基本平衡\n")
+}
+
+```
+
+
+
+
+
+
+
+
 
 # Project Plan Summary
