@@ -11,16 +11,46 @@ output: html_document
 
 ---
 
-# Data Description
-
-- 数据来源
-- 数据集结构（字段、类型、样本量等）
-- 主要变量说明
 
 ```{r}
-# 这是 R 代码，可以直接运行 测试
-summary(cars)
-plot(cars)
+ #Load dataset
+df <- read.csv("listings.csv")
+```
+
+# Data Description
+The dataset is obtained from [Inside Airbnb](http://insideairbnb.com/), which provides detailed information about Airbnb listings across different cities. The dataset includes listing-level features such as location, property attributes, host information, and price. 
+In this project, we focus on the Sydney dataset.  
+  
+The dataset contains **`r nrow(df)` rows** and **`r ncol(df)` columns**. Variables can be grouped into three categories:  
+  - **Numerical variables:** price, minimum_nights, number_of_reviews, reviews_per_month, etc.  
+  - **Categorical variables:** room_type, neighbourhood, host_is_superhost, etc.  
+  - **Text variables:** listing name, description, host name, etc
+
+# Data Challenges
+During initial exploration, the following challenges are identified:
+Missing values: Some variables (e.g., reviews_per_month) contain many missing entries.
+Outliers: Price contains extreme values that may distort the distribution.
+Class imbalance: Some categories (e.g., specific neighbourhoods or room types) dominate the dataset.
+Text variables: Variables like description and name require NLP techniques if used
+
+| Variable Type / 变量类型 | Examples / 示例                                  | Notes / 备注                                         |
+| -------------------- | ---------------------------------------------- | -------------------------------------------------- |
+| Numerical 数值型        | price, minimum\_nights, number\_of\_reviews    | Require cleaning and outlier handling / 需要清洗和异常值处理 |
+| Categorical 类别型      | room\_type, neighbourhood, host\_is\_superhost | Require encoding / 需要编码                            |
+| Text 文本型             | name, description, host\_name                  | Optional features, may need NLP / 可选特征，可能需要 NLP    |
+| Outcome 目标变量         | price\_category (Low/Medium/High)              | Derived from price / 由价格变量派生                       |
+
+
+# Logical Connection
+
+These observations highlight both the richness and the challenges of the dataset. This naturally leads to the next step: Data Cleaning & Feature Engineering, where missing values, outliers, and categorical variables will be addressed to prepare the dataset for modeling.
+
+```{r}
+# Dataset preview 
+#str(df)
+#head(df)
+
+
 ```
 ---
 
@@ -28,7 +58,8 @@ plot(cars)
 1. Price Column Processing & Outlier Detection
 This R code finds the price column, cleans its data by removing non-numeric characters, converts it to a numeric type, and removes any rows where the price is 0 or less. It then performs an outlier analysis based on the IQR method.
 ```{r}
-library(tidyr)
+library(tidyverse)
+
 # Re-read the cleaned data from the previous step
 df <- read_csv("listings.csv", col_types = cols(.default = "c"))
 
