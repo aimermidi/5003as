@@ -606,9 +606,9 @@ generate_accommodates_report <- function(df) {
   cat("方差分析 p值:", format.pval(anova_p), "\n")
   
   if(anova_p < 0.05) {
-    cat("✅ 结论: 不同价格等级的容纳人数存在显著差异\n")
+    cat("不同价格等级的容纳人数存在显著差异\n")
   } else {
-    cat("❌ 结论: 不同价格等级的容纳人数无显著差异\n")
+    cat("不同价格等级的容纳人数无显著差异\n")
   }
   
   # 业务洞察
@@ -706,13 +706,5 @@ if (imbalance_ratio_price > 10) {
 
 ```
 
-
-
-
-
-
-
-
-可视化结果（直方图、散点图、箱线图等）
 
 # Project Plan Summary
