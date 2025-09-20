@@ -1,9 +1,63 @@
 ---
-title: "Project Title"
-author: "Your Name"
+title: "STAT5003 Project Plan and EDA (TUT10 Group6)"
+author: |
+  Sirui Li (530548597) · Bob Li · Carol Wang <br>
+  David Chen · Erin Wu
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: readable
+    code_folding: hide 
 ---
+<style>
+/* 正文与标题统一使用 Times 系列；加入中文衬线字体以防乱码 */
+body,
+h1,h2,h3,h4,h5,h6,
+h1.title, h4.author, h4.date {
+  font-family: "Times New Roman", Times,
+               "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun",
+               serif;
+}
+
+/* 代码/输出用等宽字体，避免 Times 影响对齐 */
+pre, code, kbd, samp {
+  font-family: Consolas, "Courier New", ui-monospace, Menlo, Monaco, monospace;
+  font-size: 0.95em;
+}
+</style>
+
+<!-- 内联样式：标题/作者/日期居中 + 输出滚动框（渲染后不显示为文字） -->
+<style>
+h1.title, h4.author, h4.date { text-align: center; }
+.r-output, .r-message, .r-warning {
+  max-height: 320px; overflow: auto; margin: .4rem 0 1rem; padding: .6rem;
+  background: #f8f9fa; border-radius: 6px; border: 1px solid #e5e7eb;
+}
+pre.r { background: #f8f9fa; padding: .6rem; border-radius: 6px; }
+</style>
+
+
+```{r setup, include=FALSE}
+# 代码需要存在（echo=TRUE）才能被“折叠按钮”控制；输出照常显示
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+
+# 把每段“控制台输出/print结果”包进可滚动容器
+knitr::knit_hooks$set(output = function(x, options) {
+  sprintf('<div class="r-output"><pre>%s</pre></div>', x)
+})
+
+# 如需把 message/warning 也放进滚动框，取消下面注释
+# knitr::knit_hooks$set(message = function(x, options) sprintf('<div class="r-message"><pre>%s</pre></div>', x))
+# knitr::knit_hooks$set(warning = function(x, options) sprintf('<div class="r-warning"><pre>%s</pre></div>', x))
+
+
+```
 
 # Problem Definition
 
@@ -12,21 +66,25 @@ output: html_document
 ---
 
 
-```{r}
+```{r read the data, echo=TRUE, include=TRUE}
  #Load dataset
 df <- read.csv("listings.csv")
 ```
 
 # Data Description
-The dataset is obtained from [Inside Airbnb](http://insideairbnb.com/), which provides detailed information about Airbnb listings across different cities. The dataset includes listing-level features such as location, property attributes, host information, and price. 
-In this project, we focus on the Sydney dataset.  
+The dataset is Airbnb property information in Sydney which is obtained from [Inside Airbnb](http://insideairbnb.com/), which provides detailed information about Airbnb listings across Sydney, Australia. The dataset includes listing-level features such as location, property attributes, host information, and price. 
   
 The dataset contains **`r nrow(df)` rows** and **`r ncol(df)` columns**. Variables can be grouped into three categories:  
   - **Numerical variables:** price, minimum_nights, number_of_reviews, reviews_per_month, etc.  
   - **Categorical variables:** room_type, neighbourhood, host_is_superhost, etc.  
   - **Text variables:** listing name, description, host name, etc
+  
+**Outcome variable:**
 
-# Data Challenges
+The study segments listing **prices** into discrete intervals to serve as the categorical response. Models are then estimated using price-salient predictors to accurately classify and predict the price tiers of Sydney listings.
+
+**Data Challenges**
+
 During initial exploration, the following challenges are identified:
 Missing values: Some variables (e.g., reviews_per_month) contain many missing entries.
 Outliers: Price contains extreme values that may distort the distribution.
@@ -41,28 +99,35 @@ Text variables: Variables like description and name require NLP techniques if us
 | Outcome 目标变量         | price\_category (Low/Medium/High)              | Derived from price / 由价格变量派生                       |
 
 
-# Logical Connection
 
 These observations highlight both the richness and the challenges of the dataset. This naturally leads to the next step: Data Cleaning & Feature Engineering, where missing values, outliers, and categorical variables will be addressed to prepare the dataset for modeling.
 
-```{r}
-# Dataset preview 
-#str(df)
-#head(df)
-
-
-```
 ---
 
 # Data Cleaning & Feature Engineering
-1. Price Column Processing & Outlier Detection
-This R code finds the price column, cleans its data by removing non-numeric characters, converts it to a numeric type, and removes any rows where the price is 0 or less. It then performs an outlier analysis based on the IQR method.
-```{r}
+## Price Column Processing & Outlier Detection
+We first preprocess the target column price to enable subsequent binning and relabeling. Specifically, we remove all non-numeric characters, cast price to a numeric type, and drop observations with prices ≤ 0. We then perform outlier analysis using the interquartile range (IQR) method.
+
+The following are head lines for the whole dataset and the price column:
+
+```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
 
-# Re-read the cleaned data from the previous step
+# Read in the original data (all in character format to avoid misinterpretation of "price")
 df <- read_csv("listings.csv", col_types = cols(.default = "c"))
 
+head(select(df, 1:min(6, ncol(df))), 5) %>% knitr::kable()
+
+```
+
+```{r}
+head(df["price"], 10)
+```
+**Step 1: Price Column Auto-Detection**
+
+Automatically detect and clean the price column: locate price via keywords, strip currency/thousand separators, coerce to numeric; a 10-row table compares raw vs. cleaned values to verify the result.
+
+```{r, message=FALSE, warning=FALSE}
 # Step 1: Find the price column
 price_col <- NULL
 possible_cols <- names(df)
@@ -85,9 +150,34 @@ if (is.na(price_col)) {
   stop("Error: Could not find a column representing price.")
 }
 
-message(paste0("Using '", price_col, "' as the price column."))
 
+# Cleaning comparison: Save the first 10 rows as the original, then generate the cleaned 10 rows, and combine and compare the tables.
+price_raw10 <- head(df[[price_col]], 10)
+
+df_clean_preview <- df %>%
+  mutate(
+    !!sym(price_col) := suppressWarnings(as.numeric(
+      str_remove_all(
+        str_remove_all(tolower(.data[[price_col]]), ","),
+        "[^\\d.-]"
+      )
+    ))
+  )
+
+tibble(
+  !!paste0(price_col, "_raw")   := price_raw10,
+  !!paste0(price_col, "_clean") := head(df_clean_preview[[price_col]], 10)
+) %>% knitr::kable(caption = "Price Comparison Before and After Cleaning (First 10 Lines)")
+
+```
+
+**Step 2: Price Standardization**
+
+We standardize the price column by lowercasing, removing commas and non-numeric characters, coercing values to numeric, and filtering out missing entries and prices ≤ 0. This ensures all prices used for subsequent binning and modeling are valid positive values, improving robustness.
+
+```{r, message=FALSE, warning=FALSE}
 # Step 2: Clean and convert the price column (corrected)
+
 df <- df %>%
   mutate(
     # Remove commas and non-numeric characters, then convert to numeric.
@@ -97,8 +187,15 @@ df <- df %>%
   # Now, filter out rows where the price is NA or <= 0
   filter(!is.na(!!sym(price_col)) & !!sym(price_col) > 0)
 
-message(paste0("Effective price data rows: ", nrow(df)))
 
+
+```
+
+**Step 3: IQR-Based Outlier Analysis for Price**
+
+We conduct outlier detection on the cleaned price data using the Tukey IQR rule: we compute Q1, Q3, and IQR = Q3 - Q1, and define the inlier range as [Q1-1.5\*IQR, Q3+1.5\*IQR] (Lin, Zhang, & Tong, 2025). We then summarize key diagnostics in the table IQR-based Outlier Analysis Summary, reporting Q1, Q2, IQR, the lower/upper bounds, total sample size N, the number of outliers, and the percentage of data flagged. These metrics inform whether to remove, winsorize, or simply flag outliers for subsequent robustness checks (Dash, Behera, Dehuri, & Ghosh, 2023; Mekelburg & Strauss, 2024).
+
+```{r, message=FALSE, warning=FALSE}
 # Step 3: Analyze outliers using IQR (will now work correctly)
 q1 <- quantile(df[[price_col]], 0.25)
 q3 <- quantile(df[[price_col]], 0.75)
@@ -108,19 +205,82 @@ upper_bound <- q3 + 1.5 * iqr
 
 outliers <- df %>% filter(!!sym(price_col) < lower_bound | !!sym(price_col) > upper_bound)
 
-message("\nOutlier Analysis:")
-message(paste0("Interquartile Range (IQR): ", round(iqr, 2)))
-message(paste0("Outlier Lower Bound: ", round(lower_bound, 2)))
-message(paste0("Outlier Upper Bound: ", round(upper_bound, 2)))
-message(paste0("Number of outliers: ", nrow(outliers), " (", round(nrow(outliers) / nrow(df) * 100, 2), "% of data)"))
 
-# Step 4: Save the further cleaned data
-write_csv(df, "cleaned_data.csv")
-message("\nUpdated 'cleaned_data.csv' saved with prices > 0.")
+summary_tbl <- tibble::tibble(
+  Metric = c(
+    "Q1 (25th percentile)",
+    "Q3 (75th percentile)",
+    "Interquartile Range (IQR)",
+    "Outlier Lower Bound",
+    "Outlier Upper Bound",
+    "Total Rows (N)",
+    "Number of Outliers",
+    "Percent of Data"
+  ),
+  Value = c(
+    round(q1, 2),
+    round(q3, 2),
+    round(iqr, 2),
+    round(lower_bound, 2),
+    round(upper_bound, 2),
+    nrow(df),
+    nrow(outliers),
+    paste0(round(nrow(outliers) / max(1, nrow(df)) * 100, 2), "%")
+  )
+)
+
+knitr::kable(summary_tbl, caption = "IQR-based Outlier Analysis Summary")
+```
+
+We first detect outliers with Tukey’s IQR rule and summarize Q1, median, IQR, and the implied fences to guide treatment decisions. Then, instead of deleting observations, we apply percentile-based winsorization to the price column: values below the 3rd percentile are set to P3 and values above the 97th percentile to P97, retaining all rows and preserving sample size for downstream analysis (e.g., winsorization used alongside outlier screening in recent applied work). In our data, the summary table Winsorization Summary (3%–97% percentiles) shows the thresholds (P3 = 55; P97 = 1350), N = 15735, with 920 observations clipped (≈5.85%), split between lower and upper tails. This milder trimming reduces the impact of extreme prices while keeping distributional shape largely intact for robustness checks and later modeling (Dash et al., 2023; Mekelburg & Strauss, 2024; Lin, Zhang, & Tong, 2025).
+
+
+```{r, message=FALSE, warning=FALSE}
+stopifnot(exists("df"), exists("price_col"))
+
+# 3%–97% 分位数阈值
+p_lo <- quantile(df[[price_col]], 0.03, na.rm = TRUE)
+p_hi <- quantile(df[[price_col]], 0.97, na.rm = TRUE)
+
+# 原地 winsorize：备份原价，截回到分位数区间，并标记是否被截尾
+df <- df %>%
+  dplyr::mutate(
+    !!rlang::sym(paste0(price_col, "_orig")) := .data[[price_col]],
+    !!rlang::sym(price_col) := pmin(pmax(.data[[price_col]], p_lo), p_hi),
+    .clipped_low  = .data[[paste0(price_col, "_orig")]] < p_lo,
+    .clipped_high = .data[[paste0(price_col, "_orig")]] > p_hi
+  )
+
+# 摘要表：截尾阈值、样本量、截尾数量/占比
+summary_tbl <- tibble::tibble(
+  P1  = round(p_lo,  2),
+  P99 = round(p_hi,  2),
+  N   = nrow(df),
+  Clipped_Low   = sum(df$.clipped_low,  na.rm = TRUE),
+  Clipped_High  = sum(df$.clipped_high, na.rm = TRUE),
+  Total_Clipped = sum(df$.clipped_low | df$.clipped_high, na.rm = TRUE),
+  Percent_Clipped = paste0(
+    round(100 * mean(df$.clipped_low | df$.clipped_high, na.rm = TRUE), 2), "%"
+  )
+)
+knitr::kable(summary_tbl, caption = "Winsorization Summary (3%–97% percentiles)")
+
 
 ```
-2. Feature Engineering: Price Categorization
-This section adds a new categorical column, price_class, to the dataset based on the price value. This new feature can be useful for further analysis or machine learning models.
+
+
+**Step 4: Save cleaned data**
+
+After completing the above cleaning steps, if necessary, the cleaned data can be saved into a new file named "cleaned_data.csv" by following code.
+
+```{r}
+# Step 4: Save the further cleaned data
+write_csv(df, "cleaned_data.csv")
+```
+
+
+## Feature Engineering: Price Categorization
+Building on the cleaned data, we re-detect the price column, coerce it to numeric, and bin prices into three tiers—[0,150), [150,300), and [300,+)—with non-positive or missing values labeled Invalid Price. The resulting categorical feature price_class is moved to the front of the dataset for downstream classification and grouped analysis, and saved as cleaned_data_with_price_class.csv.
 ```{r}
 # Re-read the cleaned data from the previous step
 df <- read_csv("cleaned_data.csv", col_types = cols(.default = "c"))
@@ -132,8 +292,6 @@ price_col <- names(df)[str_detect(tolower(names(df)), "price")][1]
 if (is.na(price_col)) {
   stop("Error: Could not find a column representing price.")
 }
-
-message(paste0("Using '", price_col, "' as the price column."))
 
 # Step 1: Ensure the price column is numeric before creating 'price_class'
 # This is a crucial step to prevent errors
@@ -158,11 +316,16 @@ df <- df %>%
 
 # Step 3: Save the data with the new column
 write_csv(df, "cleaned_data_with_price_class.csv")
-message("\nFile saved to 'cleaned_data_with_price_class.csv' with new 'price_class' column.")
 
 ```
-3. Missing Value Imputation
-This R code block replicates the final data cleaning step, which involves imputing missing values with specific placeholders (-1 for numeric columns and 'NA' for non-numeric columns). It also includes a function to calculate the "missing rate" based on these placeholders.
+The following is the revised data and the cleaned price data, It can be seen that the price has successfully and accurately corresponded with the price range:
+```{r, message=FALSE, warning=FALSE}
+head(df$price_class)
+head(df[price_col])
+```
+
+## Missing Value Imputation
+We performed missing-value detection and placeholder imputation on the cleaned dataset. The data were read as character, and each column was classified as numeric vs. non-numeric via a sampling-based coercion test: if more than 80% of sampled values could be coerced to numeric, the column was labeled as numeric; otherwise, non-numeric. We then applied type-specific imputation: numeric columns had NA replaced with -1 as a unified placeholder, while non-numeric columns had NA replaced with the string "NA". The imputed table was saved as cleaned_data_with_price_class_no_na.csv. For quality tracking, we computed and ranked per-column “missing/flag” rates under the following convention: for numeric columns, the share of -1; for non-numeric columns, the share of "NA" or "-1" (string). This convention preserves missingness information for downstream modeling (median/mode/time-series imputations, etc.) rather than masking it with artificial valid values.
 ```{r}
 # Load necessary libraries
 # You might need to install these packages first: install.packages("tidyverse")
@@ -205,9 +368,6 @@ df_imputed <- df %>%
 
 # Step 3: Save the final cleaned data
 write_csv(df_imputed, "cleaned_data_with_price_class_no_na.csv")
-message("\nFinal cleaned data saved to 'cleaned_data_with_price_class_no_na.csv'.")
-message(paste0("Found ", length(numeric_cols), " numeric columns."))
-message(paste0("Found ", length(non_numeric_cols), " non-numeric columns."))
 
 # Step 4: Create a function to calculate missing rates
 calculate_missing_rates <- function(data) {
@@ -223,14 +383,82 @@ calculate_missing_rates <- function(data) {
   sort(missing_rates * 100, decreasing = TRUE)
 }
 
+
 missing_rates <- calculate_missing_rates(df_imputed)
-message("\nMissing rates per column (high to low):")
 print(missing_rates)
 ```
-Following this, I swapped the positions of the `id` and `price_class` columns. Then, I performed further manual data cleaning in Excel:
+The following are the ten columns with the most missing values in the data, and a portion of the cleaned data is shown. From the second table, it can be seen that the completeness of the data has significantly improved.
+```{r}
 
-1.  I atomicized the `host_location` column, making the values as granular and indivisible as possible.
-2.  I filtered and removed rows where column data was misaligned. I also deleted columns that were not very useful for Exploratory Data Analysis (EDA), including but not limited to:
+library(readr); library(dplyr); library(knitr)
+
+df_before <- read_csv("cleaned_data_with_price_class.csv",
+                      col_types = cols(.default = "c"), show_col_types = FALSE)
+df_after  <- read_csv("cleaned_data_with_price_class_no_na.csv",
+                      show_col_types = FALSE)
+
+n <- nrow(df_before)
+
+count_before <- function(x) if (is.character(x)) sum(is.na(x) | x == "" | x == "NA") else sum(is.na(x))
+count_after <- function(x) {
+  if (is.numeric(x)) {
+    sum(x == -1, na.rm = TRUE)              
+  } else if (is.character(x)) {
+    sum(x %in% c("NA", ""), na.rm = TRUE)   
+  } else {
+    sum(is.na(x))                            
+  }
+}
+
+before_n <- sapply(df_before, count_before)
+after_n  <- sapply(df_after,  count_after)
+
+comp_tbl <- tibble::tibble(
+  column        = names(df_before),
+  before_n      = as.integer(before_n),
+  before_pct    = round(100 * before_n / n, 2),
+  after_n       = as.integer(after_n),
+  after_pct     = round(100 * after_n / n, 2),
+  reduction_n   = before_n - after_n,
+  reduction_pct = round(100 * (before_n - after_n) / n, 2)
+) %>% arrange(desc(reduction_n))
+
+# Reduce the number of printed columns by the greatest extent.
+print(kable(head(comp_tbl, 10), caption = "The 10 columns with the greatest reduction in missing/marked data"))
+
+# Overall Comparison (Full Table)
+overall <- tibble::tibble(
+  before_n      = sum(before_n),
+  before_pct    = round(100 * sum(before_n) / (n * ncol(df_before)), 2),
+  after_n       = sum(after_n),
+  after_pct     = round(100 * sum(after_n) / (n * ncol(df_after)),  2),
+  reduction_n   = sum(before_n) - sum(after_n),
+  reduction_pct = round(100 * (sum(before_n) - sum(after_n)) / (n * ncol(df_before)), 2)
+)
+print(kable(overall, caption = "Overall absence/label comparison"))
+
+
+
+
+```
+
+## Post-processing and Feature Curation
+After completing the data cleaning, we still have some subsequent processing to do on the data. The following steps streamline the dataset, reduce noise introduced by poorly populated or non-analytical fields, and standardize key attributes for reliable EDA and modeling.
+
+**Column order adjustment: **
+
+Reordered columns so that id precedes price_class to improve identifier visibility during analysis.
+
+**Location normalization: **
+
+Atomicized host_location into the most granular, indivisible values to reduce ambiguity and enable consistent grouping/joining.
+
+**Row integrity filtering: **
+
+Removed records with column misalignment detected during manual inspection to prevent downstream parsing errors.
+
+**Low-value / high-missingness features removed:**
+
     * `listing_url`
     * `scrape_id`
     * `description`
@@ -244,7 +472,6 @@ Following this, I swapped the positions of the `id` and `price_class` columns. T
     * `host_picture_url`
     * `neighbourhood_group_cleansed`
     * `calendar_updated`
-
 These features were removed either because they had little analytical value or because their missing data rate was close to 100%.
 
 # Exploratory Data Analysis (EDA)
@@ -252,4 +479,86 @@ These features were removed either because they had little analytical value or b
 
 可视化结果（直方图、散点图、箱线图等）
 
-# Project Plan Summary
+# Modeling Plan
+## Model Selection
+
+1. **Softmax Logistic Regression**
+
+We adopt multinomial logistic regression as the baseline due to its strong interpretability and robustness in multi-class settings. Model coefficients directly indicate the direction and relative magnitude of each feature’s effect on the odds of belonging to different price bands. With appropriate regularization, it typically delivers a stable and reliable baseline on small to moderate sample sizes.
+
+This model fits our dataset well: the features include both numeric variables and categorical variables represented via one-hot encoding. After standardization and L1/L2 regularization, the model mitigates instability from multicollinearity and noisy features. Although its decision boundary is linear, modest feature engineering—such as adding interaction terms or using piecewise transforms—can increase flexibility. Even without extensive engineering, multinomial logistic regression provides a clear and reproducible baseline against which the gains of more complex models can be assessed.
+
+2. **Linear Discriminant Analysis (LDA)**
+
+Linear Discriminant Analysis (LDA) achieves class separation by projecting data into a low-dimensional subspace that maximizes between-class variance and minimizes within-class variance. When class covariance structures are similar and variables, after appropriate transformations, are approximately Gaussian, LDA can deliver performance comparable to more complex models with very low model complexity. Its discriminant axes also clarify which composite directions primarily separate price bands, aiding interpretability.
+
+Regarding applicability, LDA is sensitive to the scale of numeric features, making standardization a prerequisite. Highly correlated or redundant variables should be addressed via dimension reduction or feature selection to stabilize covariance estimation. With moderate sample sizes and not severely imbalanced classes, parameter estimates are typically stable; if the equal-covariance assumption is weak, a shrinkage version of LDA can yield more robust discriminant directions, balancing interpretability and performance.
+
+3. **K Nearest Neighbour (kNN)**
+
+The k-nearest neighbors (kNN) method does not rely on an explicit functional form and naturally captures complex local structure and nonlinear decision boundaries. When class assignment is jointly shaped by multi-dimensional neighborhood characteristics, kNN often provides a clear and informative reference.
+
+For our task, the effectiveness of kNN hinges on the metric and scale of the feature space. Numeric variables should be standardized, and categorical variables can be made compatible with Euclidean distance through one-hot encoding. The number of neighbors (k) requires tuning, and distance weighting can be used to reduce the influence of noisy samples. Because kNN is sensitive to high-dimensional sparsity and irrelevant features, we will combine it with feature selection or dimensionality reduction to mitigate the curse of dimensionality and ensure fair, stable comparisons as a local model.
+
+4. **Support Vector Machine (SVM, RBF kernel)**
+
+Kernel SVM is selected for its consistent performance on complex nonlinear boundaries and its strong generalization. Grounded in the maximum-margin principle, SVM seeks the widest separating boundary in a high-dimensional implicit feature space. With appropriate regularization (C) and kernel width (γ), the RBF kernel models curved decision boundaries induced by intertwined factors such as location, amenities, and ratings—without explicitly engineering numerous interactions or higher-order terms. The kernel trick externalizes representational complexity to the kernel itself, enabling the model to capture key structures while remaining comparatively compact.
+
+For our multi-class setting, we use a one-vs-rest scheme, standardize all numeric features, and apply one-hot encoding to categorical variables for SVM compatibility. Because performance is sensitive to the joint tuning of C and γ, we rely on stratified cross-validation with grid or Bayesian search to mitigate overfitting, and we incorporate class weights when class imbalance is present. Notably, the SVM decision function depends on a limited set of support vectors, which often yields competitive margins and robust generalization in medium-dimensional feature spaces with moderate sample sizes. Compared with a linear baseline, kernel SVM provides meaningful nonlinear gains without the data scale and hyperparameter complexity typically required by deep models. When calibrated probabilities are needed for thresholding, we will apply temperature scaling or Platt scaling to improve the reliability of probability estimates.
+
+5. **Random Forest**
+
+Random forests model nonlinear relationships and feature interactions with minimal distributional assumptions, and they are relatively robust to outliers and monotonic transformations. By combining bagging with feature subsampling, they reduce variance while maintaining the capacity to fit complex decision boundaries. In settings with heterogeneous variables—such as location, amenities, reviews, and availability—random forests typically deliver strong initial performance with limited preprocessing and provide feature importance measures that aid interpretation.
+
+For our dataset, random forests naturally handle most numeric variables, and categorical variables only require one-hot encoding. The model can capture salient nonlinear interactions—such as location × amenities—that are critical for distinguishing price bands. To prevent overfitting and control computation, we will tune the number of trees, maximum depth, minimum samples per leaf, and the number of features considered at each split. When class distributions are imbalanced, we will apply balanced sampling or class weights to stabilize training and evaluation.
+——
+Overall, the five models span a broad methodological spectrum—from linear to nonlinear, discriminative to generative, and parametric to non-parametric. Using a consistent cross-validation design and a unified data-processing pipeline, we can quantify their relative gains on the price-band classification task and decide whether to introduce higher-complexity ensemble approaches or pursue more fine-grained feature engineering to further improve performance and robustness.
+
+## Evaluation Method
+1. **Hierarchical nested cross-validation**
+
+We use stratified k-fold cross-validation as the outer evaluation and perform an additional inner cross-validation within each outer training fold for hyperparameter tuning. All preprocessing steps (imputation, standardization, one-hot encoding, and feature selection) are encapsulated in a single pipeline and fitted within folds to prevent information leakage and selection bias (Cawley & Talbot, 2010; Varma & Simon, 2006). Stratification maintains the price_class distribution across folds; when observations are correlated by host or geography, group- or block-wise cross-validation is adopted to assess transferability (Nadeau & Bengio, 2003).
+
+The rationale for nested CV is to decouple model selection from performance estimation, thereby avoiding the optimistic bias that arises when both are conducted within the same CV loop. This is especially important when comparing multiple models—particularly those sensitive to hyperparameters such as SVMs and random forests—so as to obtain generalization error estimates closer to those from an independent test set (Cawley & Talbot, 2010; Varma & Simon, 2006).
+
+2. **Macro-F1) and MCC**
+
+Macro-F1 evaluates overall classification quality by scoring each class separately and then averaging, thus preventing majority classes from dominating the metric and masking minority-class performance. The Matthews correlation coefficient (MCC) combines TP/TN/FP/FN into a single correlation measure and is more robust under class imbalance and asymmetric error distributions, avoiding the pitfalls of relying solely on accuracy or a single F1 score (Chicco & Jurman, 2020; Powers, 2011). We report the mean macro-F1 and MCC with 95% confidence intervals on the outer folds as the primary basis for model ranking and significance testing.
+
+We designate MCC as a co-primary metric because recent systematic comparisons show that MCC yields a more reliable global association measure across a range of imbalance and noise settings (Chicco & Jurman, 2020), while macro-F1 ensures equal consideration of all price bands; the two metrics are complementary (Powers, 2011).
+
+3. **ROC-AUC and Log Loss / Brier**
+
+For discriminative ability, we report the macro-averaged ROC-AUC (e.g., One-vs-Rest followed by averaging across classes) using the Hand and Till generalization to ensure comparability and threshold invariance in the multi-class setting (Hand & Till, 2001). For probability quality, we use Log Loss or the Brier score to assess the credibility of predicted probabilities, rather than relying solely on ranking performance (Brier, 1950; Powers, 2011).
+
+When probability estimates are under- or over-confident, we apply temperature scaling or Platt scaling on a validation set and re-examine Log Loss/Brier and calibration curves, thereby improving the usability and reliability of price-band probabilities for downstream decisions (Guo et al., 2017).
+
+4. **Confusion Matrix + Calibration/Threshold Diagnostics**
+
+Aggregated confusion matrices on the outer test folds identify which adjacent price bands are most frequently confused and, together with class-wise precision and recall, clarify “where errors occur and to whom they are assigned.” This separates separability (“can classes be distinguished?”) from calibration and thresholding (“are predictions accurate and reported reliably?”) (Powers, 2011). We then plot threshold–metric curves (F1/precision/recall as a function of the decision threshold) and calibration curves with expected calibration error (ECE) to provide quantitative evidence for threshold selection and downstream policy design (Guo et al., 2017; Powers, 2011).
+
+In our setting, price bands are shaped by interactions among location, amenities, and ratings, making adjacent bands particularly prone to confusion. These diagnostics help determine whether errors stem from data quality issues (misalignment, outliers, high missingness) or from insufficient feature representation (need for engineered or binned features), thereby guiding the next iteration of feature engineering and data remediation (Powers, 2011).
+
+# Reference
+
+Brier, G. W. (1950). Verification of forecasts expressed in terms of probability. Monthly Weather Review, 78(1), 1–3.*
+
+Cawley, G. C., & Talbot, N. L. C. (2010). On over-fitting in model selection and subsequent selection bias in performance evaluation. Journal of Machine Learning Research, 11, 2079–2107.
+
+Chicco, D., & Jurman, G. (2020). The advantages of the Matthews correlation coefficient (MCC) over F1 score and accuracy in binary classification evaluation. BMC Genomics, 21, 6. https://doi.org/10.1186/s12864-019-6413-7
+
+Demšar, J. (2006). Statistical comparisons of classifiers over multiple data sets. Journal of Machine Learning Research, 7, 1–30.
+
+Dash, C. S. K., Behera, A. K., Dehuri, S., & Ghosh, A. (2023). An outliers detection and elimination framework in classification task of data mining. Decision Analytics Journal, 6, 100164.
+
+Guo, C., Pleiss, G., Sun, Y., & Weinberger, K. Q. (2017). On calibration of modern neural networks. In Proceedings of the 34th International Conference on Machine Learning (ICML) (pp. 1321–1330).
+
+Hand, D. J., & Till, R. J. (2001). A simple generalisation of the area under the ROC curve for multiple class classification problems. Machine Learning, 45(2), 171–186. https://doi.org/10.1023/A:1010920819831
+
+Lin, H., Zhang, R., & Tong, T. (2025). When Tukey meets Chauvenet: A new boxplot criterion for outlier detection. Journal of Computational and Graphical Statistics.
+
+Mekelburg, E., & Strauss, J. (2024). Pooling and winsorizing machine learning forecasts to predict stock returns with high-dimensional data. Journal of Empirical Finance, 79, 101538.
+
+Nadeau, C., & Bengio, Y. (2003). Inference for the generalization error. Machine Learning, 52(3), 239–281. https://doi.org/10.1023/A:1024068626366
+
+Powers, D. M. W. (2011). Evaluation: From precision, recall and F-measure to ROC, informedness, markedness & correlation. Journal of Machine Learning Technologies, 2(1), 37–63.
