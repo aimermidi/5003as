@@ -1,7 +1,7 @@
 ---
 title: "STAT5003 Project Plan and EDA (TUT10 Group6)"
 author: |
-  Sirui Li (530548597) · Bob Li · Carol Wang <br>
+  Sirui Li (530548597) · Haodong（Marcus） Yao（530688077）· Carol Wang <br>
   David Chen · Kezhao Wu (540585108)
 date: "`r Sys.Date()`"
 output:
@@ -12,7 +12,6 @@ output:
     code_folding: hide 
 ---
 <style>
-/* 正文与标题统一使用 Times 系列；加入中文衬线字体以防乱码 */
 body,
 h1,h2,h3,h4,h5,h6,
 h1.title, h4.author, h4.date {
@@ -21,14 +20,12 @@ h1.title, h4.author, h4.date {
                serif;
 }
 
-/* 代码/输出用等宽字体，避免 Times 影响对齐 */
 pre, code, kbd, samp {
   font-family: Consolas, "Courier New", ui-monospace, Menlo, Monaco, monospace;
   font-size: 0.95em;
 }
 </style>
 
-<!-- 内联样式：标题/作者/日期居中 + 输出滚动框（渲染后不显示为文字） -->
 <style>
 h1.title, h4.author, h4.date { text-align: center; }
 .r-output, .r-message, .r-warning {
@@ -40,14 +37,11 @@ pre.r { background: #f8f9fa; padding: .6rem; border-radius: 6px; }
 
 
 ```{r setup, include=FALSE}
-# 代码需要存在（echo=TRUE）才能被“折叠按钮”控制；输出照常显示
 knitr::opts_chunk$set(
   echo    = TRUE,
   message = FALSE,
   warning = FALSE
 )
-
-# 把每段“控制台输出/print结果”包进可滚动容器
 knitr::knit_hooks$set(output = function(x, options) {
   sprintf('<div class="r-output"><pre>%s</pre></div>', x)
 })
@@ -91,25 +85,20 @@ Outliers: Price contains extreme values that may distort the distribution.
 Class imbalance: Some categories (e.g., specific neighbourhoods or room types) dominate the dataset.
 Text variables: Variables like description and name require NLP techniques if used
 
-| Variable Type / 变量类型 | Examples / 示例                                  | Notes / 备注                                         |
+| Variable Type   | Examples                                  | Notes                                           |
 | -------------------- | ---------------------------------------------- | -------------------------------------------------- |
-| Numerical 数值型        | price, minimum\_nights, number\_of\_reviews    | Require cleaning and outlier handling / 需要清洗和异常值处理 |
-| Categorical 类别型      | room\_type, neighbourhood, host\_is\_superhost | Require encoding / 需要编码                            |
-| Text 文本型             | name, description, host\_name                  | Optional features, may need NLP / 可选特征，可能需要 NLP    |
-| Outcome 目标变量         | price\_category (Low/Medium/High)              | Derived from price / 由价格变量派生                       |
-
-
+| Numerical         | price, minimum\_nights, number\_of\_reviews    | Require cleaning and outlier handling /  |
+| Categorical       | room\_type, neighbourhood, host\_is\_superhost | Require encoding /                             |
+| Text             | name, description, host\_name                  | Optional features, may need NLP /     |
+| Outcome          | price\_category (Low/Medium/High)              | Derived from price /                        |
 
 These observations highlight both the richness and the challenges of the dataset. This naturally leads to the next step: Data Cleaning & Feature Engineering, where missing values, outliers, and categorical variables will be addressed to prepare the dataset for modeling.
-
 ---
 
 # Data Cleaning & Feature Engineering
 ## Price Column Processing & Outlier Detection
 We first preprocess the target column price to enable subsequent binning and relabeling. Specifically, we remove all non-numeric characters, cast price to a numeric type, and drop observations with prices ≤ 0. We then perform outlier analysis using the interquartile range (IQR) method.
-
 The following are head lines for the whole dataset and the price column:
-
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
 
@@ -172,7 +161,6 @@ tibble(
 ```
 
 **Step 2: Price Standardization**
-
 We standardize the price column by lowercasing, removing commas and non-numeric characters, coercing values to numeric, and filtering out missing entries and prices ≤ 0. This ensures all prices used for subsequent binning and modeling are valid positive values, improving robustness.
 
 ```{r, message=FALSE, warning=FALSE}
@@ -192,7 +180,6 @@ df <- df %>%
 ```
 
 **Step 3: IQR-Based Outlier Analysis for Price**
-
 We conduct outlier detection on the cleaned price data using the Tukey IQR rule: we compute Q1, Q3, and IQR = Q3 - Q1, and define the inlier range as [Q1-1.5\*IQR, Q3+1.5\*IQR] (Lin, Zhang, & Tong, 2025). We then summarize key diagnostics in the table IQR-based Outlier Analysis Summary, reporting Q1, Q2, IQR, the lower/upper bounds, total sample size N, the number of outliers, and the percentage of data flagged. These metrics inform whether to remove, winsorize, or simply flag outliers for subsequent robustness checks (Dash, Behera, Dehuri, & Ghosh, 2023; Mekelburg & Strauss, 2024).
 
 ```{r, message=FALSE, warning=FALSE}
@@ -231,10 +218,7 @@ summary_tbl <- tibble::tibble(
 
 knitr::kable(summary_tbl, caption = "IQR-based Outlier Analysis Summary")
 ```
-
 We first detect outliers with Tukey’s IQR rule and summarize Q1, median, IQR, and the implied fences to guide treatment decisions. Then, instead of deleting observations, we apply percentile-based winsorization to the price column: values below the 3rd percentile are set to P3 and values above the 97th percentile to P97, retaining all rows and preserving sample size for downstream analysis (e.g., winsorization used alongside outlier screening in recent applied work). In our data, the summary table Winsorization Summary (3%–97% percentiles) shows the thresholds (P3 = 55; P97 = 1350), N = 15735, with 920 observations clipped (≈5.85%), split between lower and upper tails. This milder trimming reduces the impact of extreme prices while keeping distributional shape largely intact for robustness checks and later modeling (Dash et al., 2023; Mekelburg & Strauss, 2024; Lin, Zhang, & Tong, 2025).
-
-
 ```{r, message=FALSE, warning=FALSE}
 stopifnot(exists("df"), exists("price_col"))
 
@@ -270,7 +254,6 @@ knitr::kable(summary_tbl, caption = "Winsorization Summary (3%–97% percentiles
 
 
 **Step 4: Save cleaned data**
-
 After completing the above cleaning steps, if necessary, the cleaned data can be saved into a new file named "cleaned_data.csv" by following code.
 
 ```{r}
@@ -444,34 +427,16 @@ print(kable(overall, caption = "Overall absence/label comparison"))
 
 ## Post-processing and Feature Curation
 After completing the data cleaning, we still have some subsequent processing to do on the data. The following steps streamline the dataset, reduce noise introduced by poorly populated or non-analytical fields, and standardize key attributes for reliable EDA and modeling.
-
 **Column order adjustment: **
-
 Reordered columns so that id precedes price_class to improve identifier visibility during analysis.
-
 **Location normalization: **
-
 Atomicized host_location into the most granular, indivisible values to reduce ambiguity and enable consistent grouping/joining.
-
 **Row integrity filtering: **
-
 Removed records with column misalignment detected during manual inspection to prevent downstream parsing errors.
-
 **Low-value / high-missingness features removed:**
-
-    * `listing_url`
-    * `scrape_id`
-    * `description`
-    * `neighborhood_overview`
-    * `picture_url`
-    * `host_id`
-    * `host_url`
-    * `host_name`
-    * `host_about`
-    * `host_thumbnail_url`
-    * `host_picture_url`
-    * `neighbourhood_group_cleansed`
-    * `calendar_updated`
+    * `listing_url` * `scrape_id` * `description` * `neighborhood_overview` * `picture_url`
+    * `host_id` * `host_url` * `host_name` * `host_about` * `host_thumbnail_url` * `host_picture_url`
+    * `neighbourhood_group_cleansed` * `calendar_updated`
 These features were removed either because they had little analytical value or because their missing data rate was close to 100%.
 ```{r, message=FALSE, warning=FALSE}
 library(dplyr)
@@ -540,7 +505,6 @@ write_csv(df_filtered, "cleaned_data_with_price_class_no_dislocation.csv")
 print(dim(df_filtered))
 ```
 After executing the above code, we first removed irrelevant columns to simplify the dataset. Then, we cleaned the host_response_rate column by trimming spaces, converting empty strings and "N/A" values into missing values, and keeping only valid percentages between 0% and 100%. Next, we processed the host_since column by converting it to character format and checking for problematic entries, such as those containing letters, quotes, or unusually long strings. We categorized these problematic cases into groups for inspection: entries with letters, long entries, and numeric entries resembling dates. Finally, we saved the cleaned dataset into a CSV file and printed its dimensions for verification.
-
 # Exploratory Data Analysis (EDA)
 
 ```{r}
