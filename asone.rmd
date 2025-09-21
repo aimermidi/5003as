@@ -624,15 +624,11 @@ title("Correlation Heatmap of Top 12 Numerical Features",
 
 ## Class Imbalance Check
 
-We examined the distribution of the target variable (price_class) and two key categorical features (room_type, neighbourhood_cleansed).
-
-  Price Class – Moderately imbalanced, with most listings in the 150–300 range. All classes remain reasonably represented.
-
-  Room Type – Strongly skewed toward entire home/apartment; private rooms are fewer, hotel/shared rooms are rare.
-
-  Neighbourhood – Highly concentrated, with Sydney dominating; other neighbourhoods have fewer listings.
-
-  Overall, class imbalance is moderate for price_class but significant for room_type and neighbourhood_cleansed, which may require weighting or stratified sampling in modeling.
+We examined the distribution of the target variable (price_class) and two key categorical features (room_type, neighbourhood_cleansed).  
+Price Class: Moderately imbalanced, with most listings in the 150–300 range. All classes remain reasonably represented.  
+Room Type: Strongly skewed toward entire home/apartment; private rooms are fewer, hotel/shared rooms are rare.  
+Neighbourhood: Highly concentrated, with Sydney dominating; other neighbourhoods have fewer listings.  
+Overall, class imbalance is moderate for price_class but significant for room_type and neighbourhood_cleansed, which may require weighting or stratified sampling in modeling.
 
 ```{r}
 # Visualization: bar charts
