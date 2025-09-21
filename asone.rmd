@@ -216,11 +216,11 @@ We detect outliers with Tukey’s IQR rule and summarize Q1, median, IQR, and fe
 ```{r, message=FALSE, warning=FALSE, results='hide'}
 stopifnot(exists("df"), exists("price_col"))
 
-# 3%–97% 分位数阈值
+# Calculate 3rd and 97th percentiles for winsorization
 p_lo <- quantile(df[[price_col]], 0.03, na.rm = TRUE)
 p_hi <- quantile(df[[price_col]], 0.97, na.rm = TRUE)
 
-# 原地 winsorize：备份原价，截回到分位数区间，并标记是否被截尾
+# Winsorize the price column and track clipping   
 df <- df %>%
   dplyr::mutate(
     !!rlang::sym(paste0(price_col, "_orig")) := .data[[price_col]],
@@ -229,7 +229,7 @@ df <- df %>%
     .clipped_high = .data[[paste0(price_col, "_orig")]] > p_hi
   )
 
-# 摘要表：截尾阈值、样本量、截尾数量/占比
+# Summarize clipping
 summary_tbl <- tibble::tibble(
   P1  = round(p_lo,  2),
   P99 = round(p_hi,  2),
