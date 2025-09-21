@@ -34,7 +34,7 @@ pre, code, kbd, samp {
 <style>
 h1.title, h4.author, h4.date { text-align: center; }
 .r-output, .r-message, .r-warning {
-  max-height: 320px; overflow: auto; margin: .4rem 0 1rem; padding: .6rem;
+  max-height: 200px; overflow: auto; margin: .4rem 0 1rem; padding: .6rem;
   background: #f8f9fa; border-radius: 6px; border: 1px solid #e5e7eb;
 }
 pre.r { background: #f8f9fa; padding: .6rem; border-radius: 6px; }
@@ -63,7 +63,6 @@ knitr::knit_hooks$set(output = function(x, options) {
 For this task, we selected the Sydney dataset from the Inside Airbnb website. Our research question is: to predict the price category of a property based on its various features. This is a clear classification task, where the variable `price_category` has discrete categories—such as high-end, budget, and mid-range—as prices fall into distinct intervals. Our objective is to assign listings to appropriate price categories based on their attributes, making this a clear classification problem. This research holds significant societal value: as a major global tourist destination, Sydney benefits from our predictive model. Travelers can swiftly find budget-friendly accommodations, while hosts can optimize their listings by analyzing high-priced property characteristics. Overall, analyzing Sydney's Airbnb data provides valuable insights for travelers, governments, and tourism management agencies.
 
 ---
-
 
 ```{r read the data, echo=TRUE, include=TRUE}
  #Load dataset
@@ -496,7 +495,7 @@ df <- read.csv("cleaned_data_with_price_class_no_dislocation.csv", encoding = "l
 
 ## 1. Distribution of the Target Variable
 The target variable price_class is divided into three ranges: low [0,150), medium [150,300), and high [300,+). As shown in the bar chart, the medium price category contains the largest proportion of listings, exceeding 4,500 entries. The low price category follows, with approximately 3,300 listings, while the high price category accounts for slightly above 3,000 listings.
-```{r}
+```{r,out.width="70%",fig.align="center"}
 # Use a bar chart to visualize the distribution of price_class.
 ggplot(df, aes(x = price_class)) +
   geom_bar(fill = "steelblue") +
@@ -508,7 +507,7 @@ ggplot(df, aes(x = price_class)) +
 
 ### 2.1 Room Type vs. Price Class
 The distribution of room_type across price_class categories shows clear differences. Entire home/apt dominates the dataset, especially in the medium and high price ranges. Private rooms are mostly concentrated in the low-price category, while hotel rooms and shared rooms are rare and contribute minimally. This pattern highlights room type as a strong determinant of listing price, with full-property rentals generally commanding higher values.
-```{r}
+```{r,out.width="50%",fig.align="center"}
 # Room Type vs Price Class
   ggplot(df, aes(x = room_type, fill = price_class)) +
     geom_bar(position = "dodge") +
@@ -520,7 +519,7 @@ The distribution of room_type across price_class categories shows clear differen
 ### 2.2 Neighbourhood vs. Price Class (Optional: If the length exceeds the limit, it can be deleted.)
 The distribution of listings across the top 10 neighbourhoods shows notable variation in price categories. Sydney dominates the dataset, with a majority of listings in the medium and high price classes. In contrast, areas such as Randwick, and North Sydney present a more balanced mix of low- and mid-priced properties, while suburbs like Waverley and Manly display relatively higher proportions of high-price listings. These differences highlight the strong influence of location on pricing, confirming that neighbourhood is a key determinant of property value alongside room type.
 
-```{r}
+```{r,out.width="70%", fig.align="center"}
 # Step 1: Calculate the frequency and select the top ten
 top_10 <- names(sort(table(df$neighbourhood_cleansed), decreasing = TRUE))[1:10]
 
@@ -620,13 +619,9 @@ title("Correlation Heatmap of Top 12 Numerical Features",
 ## 5. Class Imbalance Check
 
   We examined the distribution of the target variable (price_class) and two key categorical features (room_type, neighbourhood_cleansed).
-  
   Price Class – Moderately imbalanced, with most listings in the 150–300 range. All classes remain reasonably represented.
-  
   Room Type – Strongly skewed toward entire home/apartment; private rooms are fewer, hotel/shared rooms are rare.
-  
   Neighbourhood – Highly concentrated, with Sydney dominating; other neighbourhoods have fewer listings.
-  
   Overall, class imbalance is moderate for price_class but significant for room_type and neighbourhood_cleansed, which may require weighting or stratified sampling in modeling.
 ```{r}
 # Visualization: bar charts
