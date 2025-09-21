@@ -20,6 +20,11 @@ h1.title, h4.author, h4.date {
                serif;
 }
 
+body {
+  font-size: 10px;   
+  line-height: 1.5;
+}
+
 pre, code, kbd, samp {
   font-family: Consolas, "Courier New", ui-monospace, Menlo, Monaco, monospace;
   font-size: 0.95em;
