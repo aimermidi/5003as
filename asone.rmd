@@ -75,7 +75,7 @@ For this task, we selected the Sydney dataset from the Inside Airbnb website. Ou
 # Data Description
 The dataset is Airbnb property information in Sydney which is obtained from [Inside Airbnb](http://insideairbnb.com/), which provides detailed information about Airbnb listings across Sydney, Australia. The dataset includes listing-level features such as location, property attributes, host information, and price. 
   
-The dataset contains **`r nrow(df)` rows** and **`r ncol(df)` columns**. Variables can be grouped into three categories:  
+The dataset contains 18187 rows and 79 columns. Variables can be grouped into three categories:  
   - **Numerical variables:** price, minimum_nights, number_of_reviews, reviews_per_month, etc.  
   - **Categorical variables:** room_type, neighbourhood, host_is_superhost, etc.  
   - **Text variables:** listing name, description, host name, etc
@@ -621,6 +621,7 @@ title("Correlation Heatmap of Top 12 Numerical Features",
       cex.main = 1.0)
 
 ```
+The heatmap reveals strong positive correlations among accommodates, bedrooms, and beds, suggesting potential multicollinearity. Other numerical features show weaker correlations and may provide complementary information for modeling.
 
 ## Class Imbalance Check
 
