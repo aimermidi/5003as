@@ -486,19 +486,18 @@ write_csv(df_filtered, "cleaned_data_with_price_class_no_dislocation.csv")
 print(dim(df_filtered))
 ```
 After executing the above code, we first removed irrelevant columns to simplify the dataset. Then, we cleaned the host_response_rate column by trimming spaces, converting empty strings and "N/A" values into missing values, and keeping only valid percentages between 0% and 100%. Next, we processed the host_since column by converting it to character format and checking for problematic entries.
+
 # Exploratory Data Analysis (EDA)
 
-```{r}
+## Distribution of the Target Variable
+The target variable price_class is divided into three ranges: low [0,150), medium [150,300), and high [300,+). As shown in the bar chart, the medium price category contains the largest number of listings, with more than 6,500 entries. The low and high price categories are close in size, each with around 4,500 listings. This visualization provides an overview of how listings are distributed across price ranges, setting the stage for further analysis in subsequent sections.
+```{r,out.width="50%",fig.align="center",out.height="50%"}
 library(patchwork)
 library(corrplot)
 library(ggplot2)
 library(tidyverse)
 df <- read.csv("cleaned_data_with_price_class_no_dislocation.csv", encoding = "latin1")
-```
 
-## 1. Distribution of the Target Variable
-The target variable price_class is divided into three ranges: low [0,150), medium [150,300), and high [300,+). As shown in the bar chart, the medium price category contains the largest proportion of listings, exceeding 4,500 entries. The low price category follows, with approximately 3,300 listings, while the high price category accounts for slightly above 3,000 listings.
-```{r,out.width="50%",fig.align="center",out.height="50%"}
 # Use a bar chart to visualize the distribution of price_class.
 ggplot(df, aes(x = price_class)) +
   geom_bar(fill = "steelblue") +
@@ -506,9 +505,9 @@ ggplot(df, aes(x = price_class)) +
   labs(title = "Distribution of Target Variable: price_class")
 ```
 
-## 2. Categorical feature
+## Categorical feature
 
-### 2.1 Room Type vs. Price Class
+### Room Type vs. Price Class
 The distribution of room_type across price_class categories shows clear differences. Entire home/apt dominates the dataset, especially in the medium and high price ranges. Private rooms are mostly concentrated in the low-price category, while hotel rooms and shared rooms are rare and contribute minimally. This pattern highlights room type as a strong determinant of listing price, with full-property rentals generally commanding higher values.
 ```{r,out.width="50%",fig.align="center"}
 # Room Type vs Price Class
@@ -518,8 +517,7 @@ The distribution of room_type across price_class categories shows clear differen
     labs(title = "Room Type vs Price Class")
 ```
 
-
-### 2.2 Neighbourhood vs. Price Class 
+### Neighbourhood vs. Price Class 
 The distribution of listings across the top 10 neighbourhoods shows notable variation in price categories. Sydney dominates the dataset, with a majority of listings in the medium and high price classes. In contrast, areas such as Randwick, and North Sydney present a more balanced mix of low- and mid-priced properties, while suburbs like Waverley and Manly display relatively higher proportions of high-price listings. These differences highlight the strong influence of location on pricing, confirming that neighbourhood is a key determinant of property value alongside room type.
 
 ```{r,out.width="50%", fig.align="center"}
@@ -541,12 +539,16 @@ ggplot(df_subset, aes(x = neighbourhood_cleansed, fill = price_class)) +
 ```
 
 
-## 3. Numerical feature
+## Numerical feature
 
 The feature accommodates was selected for exploratory analysis as it directly reflects a property’s capacity and is expected to influence price. Correlation analysis further showed that accommodates, bedrooms, and beds are strongly related and positively associated with price_class. Therefore, accommodates was selected as a representative feature to examine how property’s capacity contributes to price segmentation.
 
-### 3.1 Accommodates vs. Price Class
-The distribution of accommodates is highly right-skewed, with the majority of listings designed to host between 1 and 4 guests, indicating that smaller properties dominate the dataset. The boxplot comparison across price_class shows a clear upward trend: higher price categories generally correspond to listings that can accommodate more guests. The median capacity for the highest price class is almost double that of the lowest class, suggesting a strong positive association between property size and price level. These findings confirm that the ability to host more guests is a key structural factor driving price segmentation.
+### Accommodates vs. Price Class
+The distribution of accommodates is highly right-skewed, with most listings designed to host between 1 and 4 guests, indicating that smaller properties dominate the dataset.
+The boxplot comparison across price_class shows a clear increasing pattern: higher price categories generally correspond to listings that can accommodate more guests.
+The median capacity rises from around 2 in the lowest price class to about 6 in the highest, reflecting the intuitive link between property size and price level.
+This visualization highlights that capacity is an important numerical feature to consider in modeling.
+
 ```{r, fig.width=10, fig.height=5, out.width="70%", fig.align="center"}
 # 1. Histogram: Distribution of Accommodates
 p1 <- ggplot(df, aes(x = accommodates)) +
@@ -566,7 +568,7 @@ p2 <- ggplot(df, aes(x = price_class, y = accommodates, fill = price_class)) +
 p1 + p2  
 ```
 
-## 4. Correlation Heatmap of Numerical Features 
+## Correlation Heatmap of Numerical Features 
 
 To improve readability and focus on the most relevant insights, we selected the top 12 numerical features most strongly correlated with the target variable price_class. This approach highlights the variables that are most likely to influence price segmentation while avoiding excessive visual clutter from weakly related features. The resulting heatmap provides a clear view of key relationships and helps identify potential multicollinearity among the most influential predictors.
 ```{r,out.width="70%", fig.align="center"}
@@ -583,7 +585,8 @@ df <- df %>%
 numeric_features <- df %>%
   select(where(is.numeric)) %>%
   select(-price_class_numeric) %>% # Excluding the numerical version of the target variable
-  select(-price) 
+  select(-price) %>%
+  select(-price_orig)
 
 # Step 2: Calculate the correlation of each numerical feature with the target variable
 target_correlations <- numeric_features %>%
@@ -619,13 +622,18 @@ title("Correlation Heatmap of Top 12 Numerical Features",
 
 ```
 
-## 5. Class Imbalance Check
+## Class Imbalance Check
 
-  We examined the distribution of the target variable (price_class) and two key categorical features (room_type, neighbourhood_cleansed).
+We examined the distribution of the target variable (price_class) and two key categorical features (room_type, neighbourhood_cleansed).
+
   Price Class – Moderately imbalanced, with most listings in the 150–300 range. All classes remain reasonably represented.
+
   Room Type – Strongly skewed toward entire home/apartment; private rooms are fewer, hotel/shared rooms are rare.
+
   Neighbourhood – Highly concentrated, with Sydney dominating; other neighbourhoods have fewer listings.
+
   Overall, class imbalance is moderate for price_class but significant for room_type and neighbourhood_cleansed, which may require weighting or stratified sampling in modeling.
+
 ```{r}
 # Visualization: bar charts
 p1 <- ggplot(df, aes(x = price_class)) +
@@ -664,6 +672,7 @@ We adopt multinomial logistic regression as the baseline due to its strong inter
 This model fits our dataset well: the features include both numeric variables and categorical variables represented via one-hot encoding. After standardization and L1/L2 regularization, the model mitigates instability from multicollinearity and noisy features. Although its decision boundary is linear, modest feature engineering—such as adding interaction terms or using piecewise transforms—can increase flexibility. Even without extensive engineering, multinomial logistic regression provides a clear and reproducible baseline against which the gains of more complex models can be assessed.
 
 2. **Linear Discriminant Analysis (LDA)**
+
 Linear Discriminant Analysis (LDA) achieves class separation by projecting data into a low-dimensional subspace that maximizes between-class variance and minimizes within-class variance. When class covariance structures are similar and variables, after appropriate transformations, are approximately Gaussian, LDA can deliver performance comparable to more complex models with very low model complexity. Its discriminant axes also clarify which composite directions primarily separate price bands, aiding interpretability.
 Regarding applicability, LDA is sensitive to the scale of numeric features, making standardization a prerequisite. Highly correlated or redundant variables should be addressed via dimension reduction or feature selection to stabilize covariance estimation. With moderate sample sizes and not severely imbalanced classes, parameter estimates are typically stable; if the equal-covariance assumption is weak, a shrinkage version of LDA can yield more robust discriminant directions, balancing interpretability and performance.
 
