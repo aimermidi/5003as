@@ -662,10 +662,11 @@ p3 <- ggplot(df_top, aes(x = neighbourhood_cleansed)) +
 We adopt multinomial logistic regression as the baseline due to its strong interpretability and robustness in multi-class settings. Model coefficients directly indicate the direction and relative magnitude of each feature’s effect on the odds of belonging to different price bands. With appropriate regularization, it typically delivers a stable and reliable baseline on small to moderate sample sizes.
 
 This model fits our dataset well: the features include both numeric variables and categorical variables represented via one-hot encoding. After standardization and L1/L2 regularization, the model mitigates instability from multicollinearity and noisy features. Although its decision boundary is linear, modest feature engineering—such as adding interaction terms or using piecewise transforms—can increase flexibility. Even without extensive engineering, multinomial logistic regression provides a clear and reproducible baseline against which the gains of more complex models can be assessed.
+
 2. **Linear Discriminant Analysis (LDA)**
 Linear Discriminant Analysis (LDA) achieves class separation by projecting data into a low-dimensional subspace that maximizes between-class variance and minimizes within-class variance. When class covariance structures are similar and variables, after appropriate transformations, are approximately Gaussian, LDA can deliver performance comparable to more complex models with very low model complexity. Its discriminant axes also clarify which composite directions primarily separate price bands, aiding interpretability.
-
 Regarding applicability, LDA is sensitive to the scale of numeric features, making standardization a prerequisite. Highly correlated or redundant variables should be addressed via dimension reduction or feature selection to stabilize covariance estimation. With moderate sample sizes and not severely imbalanced classes, parameter estimates are typically stable; if the equal-covariance assumption is weak, a shrinkage version of LDA can yield more robust discriminant directions, balancing interpretability and performance.
+
 3. **K Nearest Neighbour (kNN)**
 
 The k-nearest neighbors (kNN) method does not rely on an explicit functional form and naturally captures complex local structure and nonlinear decision boundaries. When class assignment is jointly shaped by multi-dimensional neighborhood characteristics, kNN often provides a clear and informative reference.
