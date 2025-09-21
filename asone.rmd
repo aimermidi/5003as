@@ -71,7 +71,7 @@ df <- read_csv("listings.csv",
 summary(df$price)
 
 ggplot(df, aes(x = price)) +
-  geom_histogram(binwidth = 300, fill = "skyblue", color = "black") +
+  geom_histogram(binwidth = 500, fill = "skyblue", color = "black") +
   labs(title = "Price Distribution", x = "Price", y = "Count") +
   theme_minimal()
 
