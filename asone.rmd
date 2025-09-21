@@ -51,6 +51,7 @@ knitr::knit_hooks$set(output = function(x, options) {
   sprintf('<div class="r-output"><pre>%s</pre></div>', x)
 })
 
+# 如需把 message/warning 也放进滚动框，取消下面注释
 # knitr::knit_hooks$set(message = function(x, options) sprintf('<div class="r-message"><pre>%s</pre></div>', x))
 # knitr::knit_hooks$set(warning = function(x, options) sprintf('<div class="r-warning"><pre>%s</pre></div>', x))
 
@@ -61,21 +62,7 @@ knitr::knit_hooks$set(output = function(x, options) {
 
 For this task, we selected the Sydney dataset from the Inside Airbnb website. Our research question is: to predict the price category of a property based on its various features. This is a clear classification task, where the variable `price_category` has discrete categories—such as high-end, budget, and mid-range—as prices fall into distinct intervals. Our objective is to assign listings to appropriate price categories based on their attributes, making this a clear classification problem. This research holds significant societal value: as a major global tourist destination, Sydney benefits from our predictive model. Travelers can swiftly find budget-friendly accommodations, while hosts can optimize their listings by analyzing high-priced property characteristics. Overall, analyzing Sydney's Airbnb data provides valuable insights for travelers, governments, and tourism management agencies.
 
-```{r}
-library(tidyverse)
-# Data import
-df <- read_csv("listings.csv", 
-               col_types = cols(price = col_number()))
-
-# Check the distribution of the price variable
-summary(df$price)
-
-ggplot(df, aes(x = price)) +
-  geom_histogram(binwidth = 500, fill = "skyblue", color = "black") +
-  labs(title = "Price Distribution", x = "Price", y = "Count") +
-  theme_minimal()
-
-```
+---
 
 
 ```{r read the data, echo=TRUE, include=TRUE}
@@ -116,26 +103,16 @@ These observations highlight both the richness and the challenges of the dataset
 
 # Data Cleaning & Feature Engineering
 ## Price Column Processing & Outlier Detection
-We first preprocess the target column price to enable subsequent binning and relabeling. Specifically, we remove all non-numeric characters, cast price to a numeric type, and drop observations with prices ≤ 0. We then perform outlier analysis using the interquartile range (IQR) method.
-The following are head lines for the whole dataset and the price column:
+We first preprocess the target column price by removing all non-numeric characters, converting price to numeric type, and removing observations with price ≤ 0. We also use IQR for outlier analysis.
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
 
 # Read in the original data (all in character format to avoid misinterpretation of "price")
 df <- read_csv("listings.csv", col_types = cols(.default = "c"))
-
-head(select(df, 1:min(6, ncol(df))), 5) %>% knitr::kable()
-
-```
-
-```{r}
-head(df["price"], 10)
 ```
 **Step 1: Price Column Auto-Detection**
-
-Automatically detect and clean the price column: locate price via keywords, strip currency/thousand separators, coerce to numeric; a 10-row table compares raw vs. cleaned values to verify the result.
-
-```{r, message=FALSE, warning=FALSE}
+Target price by keyword, remove currency/thousands separators, and force conversion to number.
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Step 1: Find the price column
 price_col <- NULL
 possible_cols <- names(df)
@@ -178,10 +155,8 @@ tibble(
 ) %>% knitr::kable(caption = "Price Comparison Before and After Cleaning (First 10 Lines)")
 
 ```
-
 **Step 2: Price Standardization**
-We standardize the price column by lowercasing, removing commas and non-numeric characters, coercing values to numeric, and filtering out missing entries and prices ≤ 0. This ensures all prices used for subsequent binning and modeling are valid positive values, improving robustness.
-
+We normalize the price column by lowercasing it, removing commas and non-numeric characters, coercing it to numbers, and filtering out missing entries and prices ≤ 0.
 ```{r, message=FALSE, warning=FALSE}
 # Step 2: Clean and convert the price column (corrected)
 
@@ -197,10 +172,8 @@ df <- df %>%
 
 
 ```
-
 **Step 3: IQR-Based Outlier Analysis for Price**
-We conduct outlier detection on the cleaned price data using the Tukey IQR rule: we compute Q1, Q3, and IQR = Q3 - Q1, and define the inlier range as [Q1-1.5\*IQR, Q3+1.5\*IQR] (Lin, Zhang, & Tong, 2025). We then summarize key diagnostics in the table IQR-based Outlier Analysis Summary, reporting Q1, Q2, IQR, the lower/upper bounds, total sample size N, the number of outliers, and the percentage of data flagged. These metrics inform whether to remove, winsorize, or simply flag outliers for subsequent robustness checks (Dash, Behera, Dehuri, & Ghosh, 2023; Mekelburg & Strauss, 2024).
-
+We conduct outlier detection on the cleaned price data using the Tukey IQR rule: we compute Q1, Q3, and IQR = Q3 - Q1, and define the inlier range as [Q1-1.5\*IQR, Q3+1.5\*IQR] (Lin, Zhang, & Tong, 2025). We then summarize key diagnostics in the table IQR-based Outlier Analysis Summary.(Dash, Behera, Dehuri, & Ghosh, 2023; Mekelburg & Strauss, 2024).
 ```{r, message=FALSE, warning=FALSE}
 # Step 3: Analyze outliers using IQR (will now work correctly)
 q1 <- quantile(df[[price_col]], 0.25)
@@ -237,8 +210,8 @@ summary_tbl <- tibble::tibble(
 
 knitr::kable(summary_tbl, caption = "IQR-based Outlier Analysis Summary")
 ```
-We first detect outliers with Tukey’s IQR rule and summarize Q1, median, IQR, and the implied fences to guide treatment decisions. Then, instead of deleting observations, we apply percentile-based winsorization to the price column: values below the 3rd percentile are set to P3 and values above the 97th percentile to P97, retaining all rows and preserving sample size for downstream analysis (e.g., winsorization used alongside outlier screening in recent applied work). In our data, the summary table Winsorization Summary (3%–97% percentiles) shows the thresholds (P3 = 55; P97 = 1350), N = 15735, with 920 observations clipped (≈5.85%), split between lower and upper tails. This milder trimming reduces the impact of extreme prices while keeping distributional shape largely intact for robustness checks and later modeling (Dash et al., 2023; Mekelburg & Strauss, 2024; Lin, Zhang, & Tong, 2025).
-```{r, message=FALSE, warning=FALSE}
+We detect outliers with Tukey’s IQR rule and summarize Q1, median, IQR, and fences. Instead of dropping rows, we winsorize the price column: values below P3 (55) are set to 55 and above P97 (1350) to 1350, keeping N = 15,735. About 920 values (≈5.9%) were clipped across tails. This reduces extreme influence while preserving distributional shape for robust analysis (Dash et al., 2023; Mekelburg & Strauss, 2024; Lin et al., 2025).
+```{r, message=FALSE, warning=FALSE, results='hide'}
 stopifnot(exists("df"), exists("price_col"))
 
 # 3%–97% 分位数阈值
@@ -270,8 +243,6 @@ knitr::kable(summary_tbl, caption = "Winsorization Summary (3%–97% percentiles
 
 
 ```
-
-
 **Step 4: Save cleaned data**
 After completing the above cleaning steps, if necessary, the cleaned data can be saved into a new file named "cleaned_data.csv" by following code.
 
@@ -279,11 +250,9 @@ After completing the above cleaning steps, if necessary, the cleaned data can be
 # Step 4: Save the further cleaned data
 write_csv(df, "cleaned_data.csv")
 ```
-
-
 ## Feature Engineering: Price Categorization
-Building on the cleaned data, we re-detect the price column, coerce it to numeric, and bin prices into three tiers—[0,150), [150,300), and [300,+)—with non-positive or missing values labeled Invalid Price. The resulting categorical feature price_class is moved to the front of the dataset for downstream classification and grouped analysis, and saved as cleaned_data_with_price_class.csv.
-```{r}
+Building on the cleaned data, we re-detect the price column, coerce it to numeric, and bin prices into three tiers—[0,150), [150,300), and [300,+)—with non-positive or missing values labeled Invalid Price.
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Re-read the cleaned data from the previous step
 df <- read_csv("cleaned_data.csv", col_types = cols(.default = "c"))
 
@@ -320,15 +289,10 @@ df <- df %>%
 write_csv(df, "cleaned_data_with_price_class.csv")
 
 ```
-The following is the revised data and the cleaned price data, It can be seen that the price has successfully and accurately corresponded with the price range:
-```{r, message=FALSE, warning=FALSE}
-head(df$price_class)
-head(df[price_col])
-```
 
 ## Missing Value Imputation
-We performed missing-value detection and placeholder imputation on the cleaned dataset. The data were read as character, and each column was classified as numeric vs. non-numeric via a sampling-based coercion test: if more than 80% of sampled values could be coerced to numeric, the column was labeled as numeric; otherwise, non-numeric. We then applied type-specific imputation: numeric columns had NA replaced with -1 as a unified placeholder, while non-numeric columns had NA replaced with the string "NA". The imputed table was saved as cleaned_data_with_price_class_no_na.csv. For quality tracking, we computed and ranked per-column “missing/flag” rates under the following convention: for numeric columns, the share of -1; for non-numeric columns, the share of "NA" or "-1" (string). This convention preserves missingness information for downstream modeling (median/mode/time-series imputations, etc.) rather than masking it with artificial valid values.
-```{r}
+We detected missing values and classified columns as numeric or non-numeric via an 80% coercion rule. Numeric NAs were replaced with -1, non-numeric with "NA", and results saved as cleaned_data_with_price_class_no_na.csv. We tracked missingness by computing per-column flag rates (share of -1 for numeric, "NA"/"-1" for non-numeric), preserving information for downstream modeling.
+```{r, message=FALSE, warning=FALSE}
 # Load necessary libraries
 # You might need to install these packages first: install.packages("tidyverse")
 library(readr)
@@ -389,8 +353,8 @@ calculate_missing_rates <- function(data) {
 missing_rates <- calculate_missing_rates(df_imputed)
 print(missing_rates)
 ```
-The following are the ten columns with the most missing values in the data, and a portion of the cleaned data is shown. From the second table, it can be seen that the completeness of the data has significantly improved.
-```{r}
+The following code can display the ten columns with the most missing values in the data, and the statistical significant result of its improvement.
+```{r, message=FALSE, warning=FALSE, results='hide'}
 
 library(readr); library(dplyr); library(knitr)
 
@@ -438,10 +402,6 @@ overall <- tibble::tibble(
   reduction_pct = round(100 * (sum(before_n) - sum(after_n)) / (n * ncol(df_before)), 2)
 )
 print(kable(overall, caption = "Overall absence/label comparison"))
-
-
-
-
 ```
 
 ## Post-processing and Feature Curation
@@ -523,7 +483,7 @@ write_csv(df_filtered, "cleaned_data_with_price_class_no_dislocation.csv")
 # Display final data overview
 print(dim(df_filtered))
 ```
-After executing the above code, we first removed irrelevant columns to simplify the dataset. Then, we cleaned the host_response_rate column by trimming spaces, converting empty strings and "N/A" values into missing values, and keeping only valid percentages between 0% and 100%. Next, we processed the host_since column by converting it to character format and checking for problematic entries, such as those containing letters, quotes, or unusually long strings. We categorized these problematic cases into groups for inspection: entries with letters, long entries, and numeric entries resembling dates. Finally, we saved the cleaned dataset into a CSV file and printed its dimensions for verification.
+After executing the above code, we first removed irrelevant columns to simplify the dataset. Then, we cleaned the host_response_rate column by trimming spaces, converting empty strings and "N/A" values into missing values, and keeping only valid percentages between 0% and 100%. Next, we processed the host_since column by converting it to character format and checking for problematic entries.
 # Exploratory Data Analysis (EDA)
 
 ```{r}
