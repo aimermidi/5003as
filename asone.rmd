@@ -93,6 +93,7 @@ Text variables: Variables like description and name require NLP techniques if us
 | Outcome          | price\_category (Low/Medium/High)              | Derived from price /                        |
 
 These observations highlight both the richness and the challenges of the dataset. This naturally leads to the next step: Data Cleaning & Feature Engineering, where missing values, outliers, and categorical variables will be addressed to prepare the dataset for modeling.
+
 ---
 
 # Data Cleaning & Feature Engineering
