@@ -518,9 +518,6 @@ library(patchwork)
 library(corrplot)
 library(ggplot2)
 library(tidyverse)
-```
-
-```{r}
 df <- read.csv("cleaned_data_with_price_class_no_dislocation.csv", encoding = "latin1")
 ```
 
@@ -533,8 +530,6 @@ ggplot(df, aes(x = price_class)) +
   theme_minimal() +
   labs(title = "Distribution of Target Variable: price_class")
 ```
-
-#### 给报告整理人员：我选择了两个分类特征，两个数值特征。如果篇幅过长，可以删除一些（如1分类，1数值）
 
 ## 2. Categorical feature
 
@@ -573,22 +568,9 @@ ggplot(df_subset, aes(x = neighbourhood_cleansed, fill = price_class)) +
 
 ## 3. Numerical feature
 
-### 给报告整理人员：对于这两个数值特征。如果篇幅过长，可以删除一个，但开头对应的“数值特征选择根据”会有所不同，请根据需要删除另外两个。
-
-版本1（两个数值特征都保留）：
-
-To conduct a more focused exploratory analysis, we selected two representative numerical features: accommodates and review_scores_rating. The variable accommodates directly reflects the capacity of a listing and is strongly associated with property size and pricing, making it a key determinant of price class. On the other hand, review_scores_rating captures customer satisfaction and quality perception, which are critical for understanding whether higher-priced listings also deliver better guest experiences. Together, these two features provide complementary perspectives on both the structural attributes of listings and the subjective evaluations from guests, allowing for a balanced examination of price-related patterns.
-
-版本2（只保留 Accommodates vs. Price Class）：
-
 The feature accommodates was selected for exploratory analysis as it directly reflects a property’s capacity and is expected to influence price. Correlation analysis further showed that accommodates, bedrooms, and beds are strongly related and positively associated with price_class. Therefore, accommodates was selected as a representative feature to examine how property’s capacity contributes to price segmentation.
 
-版本3（只保留 Review Scores Rating vs Price Class）：
-
-The feature review_scores_rating was selected for exploratory analysis because it directly reflects customer satisfaction and perceived quality of listings. Ratings are important indicators of trust and service standards in a market economy and are likely to influence demand and pricing strategies. By examining review ratings across different price classes, we aim to assess whether higher rated listings are associated with premium pricing, or whether lower priced listings also receive higher ratings. This analysis helps provide insight into the relationship between customer satisfaction and market positioning.
-
-
-### 3.1 Accommodates vs. Price Class (Representing the size of the housing stock)
+### 3.1 Accommodates vs. Price Class
 The distribution of accommodates is highly right-skewed, with the majority of listings designed to host between 1 and 4 guests, indicating that smaller properties dominate the dataset. The boxplot comparison across price_class shows a clear upward trend: higher price categories generally correspond to listings that can accommodate more guests. The median capacity for the highest price class is almost double that of the lowest class, suggesting a strong positive association between property size and price level. These findings confirm that the ability to host more guests is a key structural factor driving price segmentation.
 ```{r, fig.width=12, fig.height=5}
 # 1. Histogram: Distribution of Accommodates
@@ -609,27 +591,6 @@ p2 <- ggplot(df, aes(x = price_class, y = accommodates, fill = price_class)) +
 p1 + p2  
 ```
 
-
-### 3.2 Review Scores Rating vs Price Class (Representative user feedback)
-The distribution of review_scores_rating is left-skewed, with most listings clustered at very high ratings, indicating that hosts generally maintain good service quality. When comparing across price_class, the boxplots show only slight differences in median ratings between low-, mid-, and high-price categories. This suggests that price is not a strong predictor of customer satisfaction, as even low-price listings achieve high ratings. The narrow interquartile ranges further confirm that review scores are consistently high regardless of price class.
-```{r, fig.width=12, fig.height=5}
-# 1. Histogram: Distribution of Review Scores Rating
-p1 <- ggplot(df, aes(x = review_scores_rating)) +
-  geom_histogram(fill = "skyblue", color = "black", bins = 30) +
-  labs(title = "Distribution of Review Scores Rating",
-       x = "Review Score Rating",
-       y = "Count")
-
-# 2. Box plot: Review Scores Rating vs Price Class
-p2 <- ggplot(df, aes(x = price_class, y = review_scores_rating, fill = price_class)) +
-  geom_boxplot() +
-  labs(title = "Review Scores Rating vs Price Class",
-       x = "Price Class",
-       y = "Review Scores Rating") +
-  theme(legend.position = "none")
-
-p1 + p2 
-```
 ## 4. Correlation Heatmap of Numerical Features 
 
 To improve readability and focus on the most relevant insights, we selected the top 12 numerical features most strongly correlated with the target variable price_class. This approach highlights the variables that are most likely to influence price segmentation while avoiding excessive visual clutter from weakly related features. The resulting heatmap provides a clear view of key relationships and helps identify potential multicollinearity among the most influential predictors.
@@ -684,8 +645,6 @@ title("Correlation Heatmap of Top 12 Numerical Features",
 ```
 
 ## 5. Class Imbalance Check
-### 给报告整理人员：类别失衡检查包含price_class, room_type and neighbourhood_cleansed. 若前面分类特征EDA只选了room_type，请自行（或通知我）删除neighbourhood_cleansed的相关代码。
-
 
   We examined the distribution of the target variable (price_class) and two key categorical features (room_type, neighbourhood_cleansed).
   
@@ -697,18 +656,7 @@ title("Correlation Heatmap of Top 12 Numerical Features",
   
   Overall, class imbalance is moderate for price_class but significant for room_type and neighbourhood_cleansed, which may require weighting or stratified sampling in modeling.
 ```{r}
-# 1. Statistical distribution tables of price_calss
-desired_order <- c("[0,150)", "[150,300)", "[300,+)")
-
-price_dist <- df %>%  
-    count(price_class, name = "count") %>%  
-    mutate(proportion = round(count / sum(count) * 100, 2),  
-           price_class = factor(price_class, levels = desired_order)) %>%  
-    arrange(price_class) 
-print(price_dist)
-
-
-# 2. Visualization: bar charts
+# Visualization: bar charts
 p1 <- ggplot(df, aes(x = price_class)) +
   geom_bar(fill = "steelblue") +
   labs(title = "Price Class Distribution", x = "Price Class", y = "Count") +
