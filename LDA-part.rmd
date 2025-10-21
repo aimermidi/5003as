@@ -1,0 +1,145 @@
+---
+title: "STAT5003 Project Plan and EDA (TUT10 Group6)"
+author: |
+  Sirui Li (530548597) · Marcus Yao (530688077) · Xi Huang(550902508) <br>
+  Huiwen Jiang（510000080） · Kezhao Wu (540585108)
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: readable
+    code_folding: hide 
+---
+<style>
+body,
+h1,h2,h3,h4,h5,h6,
+h1.title, h4.author, h4.date {
+  font-family: "Times New Roman", Times,
+               "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun",
+               serif;
+}
+
+body {
+  font-size: 10px;   
+  line-height: 1.5;
+}
+
+pre, code, kbd, samp {
+  font-family: Consolas, "Courier New", ui-monospace, Menlo, Monaco, monospace;
+  font-size: 0.95em;
+}
+</style>
+
+<style>
+h1 {
+  font-size: 24px;
+}
+h2 {
+  font-size: 20px;
+}
+h3 {
+  font-size: 18px;
+}
+h1.title, h4.author, h4.date { text-align: center; }
+.r-output, .r-message, .r-warning {
+  max-height: 200px; overflow: auto; margin: .4rem 0 1rem; padding: .6rem;
+  background: #f8f9fa; border-radius: 6px; border: 1px solid #e5e7eb;
+}
+pre.r { background: #f8f9fa; padding: .6rem; border-radius: 6px; }
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+knitr::knit_hooks$set(output = function(x, options) {
+  sprintf('<div class="r-output"><pre>%s</pre></div>', x)
+})
+
+# knitr::knit_hooks$set(message = function(x, options) sprintf('<div class="r-message"><pre>%s</pre></div>', x))
+# knitr::knit_hooks$set(warning = function(x, options) sprintf('<div class="r-warning"><pre>%s</pre></div>', x))
+
+
+```
+
+## LDA 
+### Extract Key Feature and Drop NA Value
+```{r LDA1}
+library(readr)
+library(dplyr)
+library(tidyr)
+
+file <- "cleaned_data_with_price_class_no_dislocation.csv"
+target_cols <- c("price_class", "room_type", "neighbourhood_cleansed")
+
+df_selected <- read_csv(
+  file,
+  col_select = all_of(target_cols)
+)
+
+df_lda <- df_selected %>%
+    mutate(
+        price_class = factor(price_class),
+        room_type = factor(room_type),
+        neighbourhood_cleansed = factor(neighbourhood_cleansed)
+    )
+
+
+df_after <- df_lda %>%
+    drop_na(price_class, room_type, neighbourhood_cleansed)
+
+```
+### LDA
+```{r LDA2}
+library(MASS)
+library(ggplot2)
+
+lda_fit <- lda(price_class ~ room_type + neighbourhood_cleansed, data = df_after)
+pred <- predict(lda_fit, newdata = df_after)
+
+# Confusion Matrix
+tab <- table(Predicted = pred$class, True = df_after$price_class)
+acc <- sum(diag(tab)) / sum(tab)
+
+# Visualization
+ld_df <- data.frame(pred$x, price_class = df_after$price_class)
+ggplot(ld_df, aes(x = LD1, y = LD2, color = price_class)) +
+  geom_point(size = 2, alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "LDA projection (LD1 vs LD2)",
+       x = "LD1", y = "LD2")
+
+
+```
+### Evaluation — Results and Interpretation
+
+**Summary of numeric performance.**
+
+* Overall accuracy on the evaluated set is **", round(acc,3), "**.
+* Macro-F1 (unweighted average of per-class F1) is **", round(macroF1,3), "**.
+* Multiclass MCC is **", ifelse(is.na(mcc_val), "NA", round(mcc_val,3)), "**.
+  These metrics indicate **moderate discriminative performance**: the model classifies correctly substantially more often than chance, but there remains a meaningful error rate (~40% misclassification).
+
+**Observed confusion pattern.**
+The confusion matrix shows that the middle class `[150,300)` is the largest class and is often predicted correctly, but also causes many misclassifications in both directions (predicted as either lower or higher price class). Conversely, the lowest class `[0,150)` is sometimes over-predicted and the highest class `[300,+)` is partly confused with the middle class. This pattern is typical when the target classes are adjacent price bands whose boundaries are inherently fuzzy.
+
+**Signal captured by LDA.**
+
+* The model's discriminant axes are dominated by a relatively small number of neighbourhood and room_type dummy variables (see the top contributors printed above).
+* The first linear discriminant (LD1) explains the majority of discriminative variance (approximately **", prop_trace[1], "** of trace), which suggests a single dominant direction separates classes — consistent with the LD1 vs LD2 scatter plot showing primary separation along LD1 with substantial overlap across classes.
+
+**Discussion**
+
+1. **Limited predictor set and categorical nature.** We fit LDA using only `room_type` and `neighbourhood_cleansed`. While location and room type are important predictors of price, they do not capture many price-driving factors (amenities, number of guests, bathrooms/bedrooms, host metrics, availability or review scores). With few predictors the model has limited discriminative information.
+2. **Assumption mismatch (LDA assumptions).** LDA assumes class-conditional multivariate normality and (crucially) equal covariance matrices across classes. With many predictors being dummy variables (0/1), and neighbourhood dummies being sparse and high-dimensional, the normality and equal-covariance assumptions are weakly satisfied — this degrades LDA performance and may cause biased discriminant directions.
+3. **Adjacent classes are intrinsically hard to separate.** Price bands are contiguous intervals; many listings lie near bin boundaries and are semantically similar across adjacent bands, producing unavoidable classification ambiguity.
+4. **Potential class imbalance and within-group heterogeneity.** Although priors are roughly balanced, the class conditional variance and subgroups within neighbourhoods or room types can differ, making linear separation less effective.
+
+**Conclusion of LDA:**
+LDA provides interpretable linear combinations (coefficients) that indicate how specific neighbourhoods and room type levels move observations along discriminant axes. The printed discriminant coefficients give direction and relative magnitude: positive/negative loadings show which features push listings toward higher vs lower discriminant scores. This supports **qualitative** conclusions about the influence of neighbourhood and room type. However, because many important features are missing from the model and because LDA assumptions are not perfectly met, **quantitative causal claims or precise effect sizes** based solely on this LDA should be made cautiously.
+
+LDA with `room_type` and `neighbourhood_cleansed` captures meaningful signal and yields interpretable discriminant directions, but its predictive performance is moderate because of limited predictors and assumption violations. Let's see how several other models perform on this classification problem.
