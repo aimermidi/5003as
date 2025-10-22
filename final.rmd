@@ -1,5 +1,5 @@
 ---
-title: "STAT5003 Project Plan and EDA (TUT10 Group6)"
+title: "STAT5003 Final Report (TUT10 Group6)"
 author: |
   Sirui Li (530548597) · Marcus Yao (530688077) · Xi Huang(550902508) <br>
   Huiwen Jiang（510000080） · Kezhao Wu (540585108)
@@ -659,9 +659,39 @@ p3 <- ggplot(df_top, aes(x = neighbourhood_cleansed)) +
 
 
 
-# Project Plan Summary
-# Modeling Plan
-## Model Selection
+# Classification Model Used
+## Softmax Logistic Regression
+
+
+## Linear Discriminant Analysis (LDA)
+
+
+## K Nearest Neighbour (kNN)
+
+
+## Support Vector Machine (SVM, RBF kernel)
+
+
+## Random Forest
+
+# Performance Evaluation
+## Softmax Logistic Regression
+
+
+## Linear Discriminant Analysis (LDA)
+
+
+## K Nearest Neighbour (kNN)
+
+
+## Support Vector Machine (SVM, RBF kernel)
+
+
+## Random Forest
+
+
+## Comparison of Models
+
 1. **Softmax Logistic Regression**
 
 We adopt multinomial logistic regression as the baseline due to its strong interpretability and robustness in multi-class settings. Model coefficients directly indicate the direction and relative magnitude of each feature’s effect on the odds of belonging to different price bands. With appropriate regularization, it typically delivers a stable and reliable baseline on small to moderate sample sizes.
