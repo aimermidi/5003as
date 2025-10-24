@@ -667,7 +667,143 @@ p3 <- ggplot(df_top, aes(x = neighbourhood_cleansed)) +
 
 
 ## K Nearest Neighbour (kNN)
+```{r}
+library(caret)
+library(yardstick)
+library(reshape2)
+set.seed(123)
 
+# --- 1. split dataset ---
+df <- df_filtered
+df$price_class <- factor(
+  df$price_class,
+  levels = c("[0,150)", "[150,300)", "[300,+)"),
+  ordered = TRUE
+)
+
+idx <- createDataPartition(df$price_class, p = 0.8, list = FALSE)
+train_df <- df[idx, ]
+test_df  <- df[-idx, ]
+
+# 2. categorical feature engineering for kNN
+
+dummies <- dummyVars(~ room_type, data = train_df)
+
+train_room <- predict(dummies, newdata = train_df) %>% as.data.frame()
+test_room  <- predict(dummies, newdata = test_df)  %>% as.data.frame()
+stopifnot(all(colnames(train_room) == colnames(test_room)))
+train_df <- bind_cols(train_df %>% select(-room_type), train_room)
+test_df  <- bind_cols(test_df  %>% select(-room_type), test_room)
+
+# 3. Numerical feature selection
+num_vars <- train_df %>%
+  select(where(is.numeric)) %>%
+  select(-price, -price_orig)
+
+# (a) Remove columns with little or no variance (near-zero variance)
+low_var <- nearZeroVar(num_vars)
+if (length(low_var) > 0) {
+  num_vars <- num_vars[, -low_var, drop = FALSE]
+}
+# (b) Remove columns that are highly colinear
+
+corr_mat <- cor(num_vars, use = "complete.obs")
+high_corr <- findCorrelation(corr_mat, cutoff = 0.85)
+if (length(high_corr) > 0) {
+  num_vars <- num_vars[, -high_corr, drop = FALSE]
+}
+# (c) Do a final round of screening based on relevance to the target
+corr_with_y <- sapply(
+  num_vars,
+  function(x) cor(
+    x,
+    as.numeric(train_df$price_class),
+    method = "spearman",
+    use = "complete.obs"
+  )
+)
+selected_vars <- names(corr_with_y[abs(corr_with_y) > 0.15])
+
+train_filtered <- train_df %>%
+  select(all_of(selected_vars), price_class)
+
+test_filtered <- test_df %>%
+  select(all_of(selected_vars), price_class)
+
+# 4. Parameter tuning
+ctrl_inner <- trainControl(method = "cv", number = 5)
+grid_k <- expand.grid(k = seq(15, 31, 2)) 
+knn_cv <- train(
+  price_class ~ .,
+  data = train_filtered,
+  method = "knn",
+  trControl = ctrl_inner,
+  preProcess = c("center", "scale"),
+  tuneGrid = grid_k,
+  metric = "Accuracy"
+)
+
+best_k <- knn_cv$bestTune$k
+cat("Best k from 5-fold CV:", best_k, "\n")
+
+# 5. Refit the final model with the best k
+best_knn <- train(
+  price_class ~ .,
+  data = train_filtered,
+  method = "knn",
+  trControl = trainControl(method = "none"),
+  preProcess = c("center", "scale"),
+  tuneGrid = data.frame(k = best_k)
+)
+
+# 6. Independent test set evaluation
+
+knn_test_pred <- predict(best_knn, newdata = test_filtered)
+
+
+knn_acc <- mean(knn_test_pred == test_filtered$price_class)
+cat("Test Accuracy:", knn_acc, "\n")
+
+
+cm <- confusionMatrix(
+  data      = knn_test_pred,
+  reference = test_filtered$price_class
+)
+print(cm)
+
+results_df <- data.frame(
+  truth    = test_filtered$price_class,
+  estimate = knn_test_pred
+)
+
+f1_macro <- results_df %>%
+  f_meas(truth = truth, estimate = estimate, estimator = "macro_weighted")
+cat("Macro F1 (weighted):", f1_macro$.estimate, "\n")
+
+mcc_val <- results_df %>%
+  mcc(truth = truth, estimate = estimate)
+cat("MCC:", mcc_val$.estimate, "\n")
+
+# 7. Visualisation: Confusion Matrix Heat Map
+cm_table <- as.data.frame(cm$table)
+colnames(cm_table) <- c("Prediction", "Reference", "Freq")
+
+ggplot(cm_table, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), size = 4, color = "black") +
+  scale_fill_gradient(low = "#fbe9e7", high = "#d84315") +
+  labs(
+    title = paste0("Confusion Matrix — kNN (k = ", best_k, ")"),
+    x = "True Label (Reference)",
+    y = "Predicted Label"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(angle = 30, hjust = 1)
+  )
+
+```
 
 ## Support Vector Machine (SVM, RBF kernel)
 Support Vector Machine (SVM) is a supervised learning algorithm that aims to find the optimal hyperplane separating data points from different classes by maximizing the margin between them.
