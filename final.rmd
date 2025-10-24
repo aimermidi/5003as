@@ -670,6 +670,98 @@ p3 <- ggplot(df_top, aes(x = neighbourhood_cleansed)) +
 
 
 ## Support Vector Machine (SVM, RBF kernel)
+Support Vector Machine (SVM) is a supervised learning algorithm that aims to find the optimal hyperplane separating data points from different classes by maximizing the margin between them.
+It is particularly effective for high-dimensional and complex datasets where the relationship between features and labels is not linearly separable.
+
+In this project, we employed the Radial Basis Function (RBF) kernel version of SVM because our Airbnb dataset shows non-linear feature interactions (e.g., the combination of location rating, number of amenities, and reviews affects price category in a non-linear way).
+The RBF kernel maps data into a higher-dimensional space, allowing the SVM to capture curved decision boundaries that cannot be represented by a simple linear model.
+
+### Kernel Function
+The RBF kernel is defined as:
+$$
+K(x_i, x_j) = \exp(-\gamma \|x_i - x_j\|^2)
+$$
+
+* xi, xj are feature vectors
+* γ (gamma) controls how far the influence of a single training sample reaches — a small gamma means a smoother decision boundary, while a large gamma makes the model more sensitive to individual points.
+
+The SVM with RBF kernel essentially transforms the feature space so that data from different classes become linearly separable in the higher-dimensional space.
+
+### Parameter Tuning and Training Process
+Before training, the dataset was split into 75% training data and 25% testing data, ensuring class balance across splits and delete some url columns.
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+
+library(e1071)
+library(caret)
+set.seed(123)
+
+# --- 1. split dataset ---
+df_filtered$price_class <- factor(df_filtered$price_class)
+index <- createDataPartition(df_filtered$price_class, p = 0.75, list = FALSE)
+train <- df_filtered[index, ]
+test  <- df_filtered[-index, ]
+
+# --- 2. remain dependent variables and independent variables ---
+vars <- c("accommodates", "bedrooms", "beds", "room_type", "neighbourhood_cleansed", "price_class")
+train <- train[, vars]
+test  <- test[, vars]
+head(train)
+
+
+
+```
+
+To find the optimal parameters, we used grid search combined with k-fold cross-validation (k = 5) over a range of values for C and gamma.
+Cross-validation helps to reduce overfitting and ensures that the selected parameters generalize well across unseen data. And according to the result the best parameters are C = 1, γ = 1
+The final model was then trained on the full training set with the best (C, γ) combination and evaluated on the testing set.
+```{r, message=FALSE, warning=FALSE, results='hide'}
+
+# --- 3. make sure no missing value ---
+train <- na.omit(train)
+test  <- na.omit(test)
+
+# --- 4. room_type and neighbourhood_cleansed  ---
+train$room_type <- as.factor(train$room_type)
+test$room_type  <- factor(test$room_type, levels = levels(train$room_type))
+
+train$neighbourhood_cleansed <- as.factor(train$neighbourhood_cleansed)
+test$neighbourhood_cleansed  <- factor(test$neighbourhood_cleansed, levels = levels(train$neighbourhood_cleansed))
+
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+# --- 5. Grid search and across validation ---
+tuned <- tune(
+  svm,
+  price_class ~ .,
+  data = train,
+  kernel = "radial",
+  ranges = list(cost = c(0.1, 1, 10), gamma = c(0.01, 0.1, 1)),
+  tunecontrol = tune.control(cross = 3)
+)
+
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+# --- 6. output optimal parameters ---
+best_model <- svm(
+  price_class ~ .,
+  data = train,
+  kernel = "radial",
+  cost = 1,
+  gamma = 1
+)
+
+
+# --- 7. predict ---
+pred <- predict(best_model, newdata = test)
+```
+
+
 
 
 ## Random Forest
@@ -685,6 +777,58 @@ p3 <- ggplot(df_top, aes(x = neighbourhood_cleansed)) +
 
 
 ## Support Vector Machine (SVM, RBF kernel)
+The SVM classifier with an RBF kernel achieved an overall accuracy of 70.1%, indicating a reasonably strong predictive performance across the three price classes. The macro-averaged precision (0.72) and recall (0.69) suggest that the model performs consistently across all categories, without being overly biased toward the majority class. The F1-score (0.70) further confirms a balanced trade-off between precision and recall. As shown in Figure X, most predictions align with the diagonal in the confusion matrix, especially for the middle price range ([150,300)), implying that the model captures the main pricing patterns effectively.However, some misclassification occurs between adjacent ranges (e.g., low vs. mid, mid vs. high).
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+
+# yardstick 
+res <- tibble(
+  truth = test$price_class,
+  .pred_class = factor(pred, levels = levels(test$price_class))
+)
+
+acc   <- accuracy(res, truth, .pred_class)
+prec  <- precision(res, truth, .pred_class, estimator = "macro")
+rec   <- recall(res, truth, .pred_class, estimator = "macro")
+f1    <- f_meas(res, truth, .pred_class, estimator = "macro")
+
+metrics_table <- tibble(
+  Metric = c("Accuracy", "Precision (Macro)", "Recall (Macro)", "F1-Score (Macro)"),
+  Value  = c(acc$.estimate, prec$.estimate, rec$.estimate, f1$.estimate)
+)
+
+metrics_table
+
+
+
+
+```
+
+```{r}
+library(caret)
+library(ggplot2)
+
+cm <- confusionMatrix(pred, test$price_class)
+
+cm$table
+
+cm_df <- as.data.frame(cm$table)
+
+ggplot(cm_df, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 4) +
+  scale_fill_gradient(low = "#D6EAF8", high = "#1B4F72") +
+  labs(
+    title = "Confusion Matrix of SVM (RBF Kernel)",
+    x = "True Class",
+    y = "Predicted Class",
+    fill = "Count"
+  ) +
+  theme_minimal(base_size = 13)
+
+
+
+```
 
 
 ## Random Forest
