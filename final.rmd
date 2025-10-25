@@ -658,6 +658,10 @@ p3 <- ggplot(df_top, aes(x = neighbourhood_cleansed)) +
 
 ---------
 
+
+
+
+
 # Classification Model Used
 ## Softmax Logistic Regression
 ### Model Overview
@@ -1512,7 +1516,7 @@ metrics_table
 library(caret)
 library(ggplot2)
 
-cm <- confusionMatrix(pred, test$price_class)
+cm <- confusionMatrix(svm_pred, test$price_class)
 
 cm$table
 
