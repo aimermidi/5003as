@@ -169,7 +169,7 @@ df <- df %>%
     !!sym(price_col) := as.numeric(str_remove_all(str_remove_all(tolower(!!sym(price_col)), ","), "[^\\d.-]"))
   ) %>%
   # Now, filter out rows where the price is NA or <= 0
-  filter(!is.na(!!sym(price_col)) & !!sym(price_col) > 0)
+   dplyr::filter(!is.na(!!sym(price_col)) & !!sym(price_col) > 0)
 
 
 
@@ -184,7 +184,7 @@ iqr <- q3 - q1
 lower_bound <- q1 - 1.5 * iqr
 upper_bound <- q3 + 1.5 * iqr
 
-outliers <- df %>% filter(!!sym(price_col) < lower_bound | !!sym(price_col) > upper_bound)
+outliers <- df %>% dplyr::filter(!!sym(price_col) < lower_bound | !!sym(price_col) > upper_bound)
 
 
 summary_tbl <- tibble::tibble(
@@ -441,7 +441,7 @@ df_filtered <- df_filtered %>%
 
 
 df_filtered <- df_filtered %>%
-  filter(
+  dplyr::filter(
     is.na(host_response_rate) | 
     str_detect(host_response_rate, "^(100|[0-9]{1,2})%$")
   )
@@ -459,22 +459,22 @@ problematic_entries <- df_filtered %>%
     is_numeric_date_like = str_detect(host_since_char, "^[0-9/-]+$"),
     char_length = nchar(host_since_char)
   ) %>%
-  filter(!is.na(host_since_char))
+  dplyr::filter(!is.na(host_since_char))
 
 entries_with_letters <- problematic_entries %>%
-  filter(has_letters) %>%
+  dplyr::filter(has_letters) %>%
   dplyr::select(host_since_char, char_length) %>%
   distinct() %>%
   arrange(char_length)
 
 long_entries <- problematic_entries %>%
-  filter(char_length > 20) %>%
+  dplyr::filter(char_length > 20) %>%
   dplyr::select(host_since_char, char_length) %>%
   distinct() %>%
   arrange(desc(char_length))
 
 numeric_entries <- problematic_entries %>%
-  filter(is_numeric_date_like & char_length <= 15) %>%
+  dplyr::filter(is_numeric_date_like & char_length <= 15) %>%
   dplyr::select(host_since_char) %>%
   distinct() %>%
   head(20)
@@ -684,7 +684,7 @@ cat("Original dimensions:", nrow(df), "rows ×", ncol(df), "columns\n")
 
 # Remove Invalid Price entries and convert target to ordered factor
 df <- df %>% 
-  filter(price_class != "Invalid Price") %>%
+  dplyr::filter(price_class != "Invalid Price") %>%
   mutate(price_class = factor(price_class, 
                               levels = c("[0,150)", "[150,300)", "[300,+)"),
                               ordered = TRUE))
@@ -1417,7 +1417,7 @@ cat("✓ Feature importance analysis reveals interpretable predictors\n")
 cat("✓ Ready for comparison with alternative classification algorithms\n")
 
 cat("\n", rep("=", 70), "\n")
-```¥4
+```
 
 ## Linear Discriminant Analysis (LDA)
 ```{r, message=FALSE, warning=FALSE, results='hide'}
@@ -1482,6 +1482,8 @@ The SVM classifier with an RBF kernel achieved an overall accuracy of 70.1%, ind
 
 ```{r, message=FALSE, warning=FALSE, results='hide'}
 
+
+
 # yardstick 
 res <- tibble(
   truth = test$price_class,
@@ -1533,6 +1535,10 @@ ggplot(cm_df, aes(x = Reference, y = Prediction, fill = Freq)) +
 
 
 ## Random Forest
+
+
+
+
 
 
 ## Comparison of Models
