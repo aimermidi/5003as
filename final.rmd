@@ -284,8 +284,7 @@ df <- df %>%
   )
 
 # Step 2: Reorder columns to place 'price_class' at the beginning
-df <- df %>%
-  select(price_class, everything(), -price_numeric)
+df <- dplyr::select(df, price_class, dplyr::everything(), -price_numeric)
 
 # Step 3: Save the data with the new column
 write_csv(df, "cleaned_data_with_price_class.csv")
@@ -426,7 +425,7 @@ library(readr)
 library(lubridate)
 
 df_filtered <- df_after %>%
-  select(-c(
+  dplyr::select(-c(
     listing_url, scrape_id, description, neighborhood_overview, picture_url,
     host_id, host_url, host_name, host_about, host_thumbnail_url, host_picture_url,
     neighbourhood_group_cleansed, calendar_updated
@@ -464,19 +463,19 @@ problematic_entries <- df_filtered %>%
 
 entries_with_letters <- problematic_entries %>%
   filter(has_letters) %>%
-  select(host_since_char, char_length) %>%
+  dplyr::select(host_since_char, char_length) %>%
   distinct() %>%
   arrange(char_length)
 
 long_entries <- problematic_entries %>%
   filter(char_length > 20) %>%
-  select(host_since_char, char_length) %>%
+  dplyr::select(host_since_char, char_length) %>%
   distinct() %>%
   arrange(desc(char_length))
 
 numeric_entries <- problematic_entries %>%
   filter(is_numeric_date_like & char_length <= 15) %>%
-  select(host_since_char) %>%
+  dplyr::select(host_since_char) %>%
   distinct() %>%
   head(20)
 
@@ -664,7 +663,62 @@ p3 <- ggplot(df_top, aes(x = neighbourhood_cleansed)) +
 
 
 ## Linear Discriminant Analysis (LDA)
+Linear Discriminant Analysis is a supervised classification problem that helps separate two or more classes by converting higher-dimensional data space into a lower-dimensional space. It is used to identify a linear combination of features that best separates classes within a dataset.
 
+Therefore, by testing and comparing LDA on this dataset, we can validate LDA’s data-assumption requirements and identify other classification methods that may achieve better performance on this dataset.
+
+### Extract Key Feature and Drop NA Value
+From the previous observation in 'Class Imbalance Check', we know that the two key categorical features are room_type and neighbourhood_cleansed, so we extract the key features first before starting our LDA process.
+```{r, message=FALSE, warning=FALSE, results='hide'}
+library(readr)
+library(dplyr)
+library(tidyr)
+
+file <- "cleaned_data_with_price_class_no_dislocation.csv"
+target_cols <- c("price_class", "room_type", "neighbourhood_cleansed")
+
+df_selected <- read_csv(
+  file,
+  col_select = all_of(target_cols)
+)
+
+df_lda <- df_selected %>%
+    mutate(
+        price_class = factor(price_class),
+        room_type = factor(room_type),
+        neighbourhood_cleansed = factor(neighbourhood_cleansed)
+    )
+
+
+df_after <- df_lda %>%
+    drop_na(price_class, room_type, neighbourhood_cleansed)
+
+```
+### LDA Process
+```{r, message=FALSE, warning=FALSE, results='hide'}
+library(MASS)
+library(conflicted)
+conflict_prefer("select", "dplyr")
+library(ggplot2)
+
+lda_fit <- lda(price_class ~ room_type + neighbourhood_cleansed, data = df_after)
+pred <- predict(lda_fit, newdata = df_after)
+
+# Confusion Matrix
+tab <- table(Predicted = pred$class, True = df_after$price_class)
+acc <- sum(diag(tab)) / sum(tab)
+
+# Visualization
+ld_df <- data.frame(pred$x, price_class = df_after$price_class)
+ggplot(ld_df, aes(x = LD1, y = LD2, color = price_class)) +
+  geom_point(size = 2, alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "LDA projection (LD1 vs LD2)",
+       x = "LD1", y = "LD2")
+
+
+```
+Then we got the result of LDA with a visualized plot, which shows the relation between LD1 and LD2, regarding to the 'price_class'. The detailed evaluation of LDA will be discussed later in the chapter of 'Performance Evaluation'. Next, let's dive into the implementation of KNN.
 
 ## K Nearest Neighbour (kNN)
 ```{r}
@@ -907,6 +961,58 @@ pred <- predict(best_model, newdata = test)
 
 
 ## Linear Discriminant Analysis (LDA)
+```{r, message=FALSE, warning=FALSE, results='hide'}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+file <- "cleaned_data_with_price_class_no_dislocation.csv"
+target_cols <- c("price_class", "room_type", "neighbourhood_cleansed")
+
+df_selected <- read_csv(
+  file,
+  col_select = all_of(target_cols)
+)
+
+df_lda <- df_selected %>%
+    mutate(
+        price_class = factor(price_class),
+        room_type = factor(room_type),
+        neighbourhood_cleansed = factor(neighbourhood_cleansed)
+    )
+
+
+df_after <- df_lda %>%
+    drop_na(price_class, room_type, neighbourhood_cleansed)
+
+library(MASS)
+library(ggplot2)
+
+lda_fit <- lda(price_class ~ room_type + neighbourhood_cleansed, data = df_after)
+pred <- predict(lda_fit, newdata = df_after)
+
+tab <- table(Predicted = pred$class, True = df_after$price_class)
+acc <- sum(diag(tab)) / sum(tab)
+
+ld_df <- data.frame(pred$x, price_class = df_after$price_class)
+ggplot(ld_df, aes(x = LD1, y = LD2, color = price_class)) +
+  geom_point(size = 2, alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "LDA projection (LD1 vs LD2)",
+       x = "LD1", y = "LD2")
+tab
+```
+* Overall accuracy on the evaluated set is **", round(acc,3), "**.
+* Macro-F1 (unweighted average of per-class F1) is **", round(macroF1,3), "**.
+* Multiclass MCC is **", ifelse(is.na(mcc_val), "NA", round(mcc_val,3)), "**.
+  These metrics indicate **moderate discriminative performance**: the model classifies correctly substantially more often than chance, but there remains a meaningful error rate (~40% misclassification).
+
+The confusion matrix shows that the middle class `[150,300)` is the largest class and is often predicted correctly, but also causes many misclassifications in both directions (predicted as either lower or higher price class). Conversely, the lowest class `[0,150)` is sometimes over-predicted and the highest class `[300,+)` is partly confused with the middle class. This pattern is typical when the target classes are adjacent price bands whose boundaries are inherently fuzzy.
+
+LDA provides interpretable linear combinations (coefficients) that indicate how specific neighbourhoods and room type levels move observations along discriminant axes. The printed discriminant coefficients give direction and relative magnitude: positive/negative loadings show which features push listings toward higher vs lower discriminant scores. This supports **qualitative** conclusions about the influence of neighbourhood and room type. However, because many important features are missing from the model and because LDA assumptions are not perfectly met, **quantitative causal claims or precise effect sizes** based solely on this LDA should be made cautiously.
+
+LDA with `room_type` and `neighbourhood_cleansed` captures meaningful signal and yields interpretable discriminant directions, but its predictive performance is moderate because of limited predictors and assumption violations. Let's see how several other models perform on this classification problem.
 
 
 ## K Nearest Neighbour (kNN)
