@@ -656,7 +656,7 @@ p3 <- ggplot(df_top, aes(x = neighbourhood_cleansed)) +
 
 ```
 
-
+---------
 
 # Classification Model Used
 ## Softmax Logistic Regression
@@ -964,14 +964,14 @@ conflict_prefer("select", "dplyr")
 library(ggplot2)
 
 lda_fit <- lda(price_class ~ room_type + neighbourhood_cleansed, data = df_after)
-pred <- predict(lda_fit, newdata = df_after)
+lda_pred <- predict(lda_fit, newdata = df_after)
 
 # Confusion Matrix
-tab <- table(Predicted = pred$class, True = df_after$price_class)
+tab <- table(Predicted = lda_pred$class, True = df_after$price_class)
 acc <- sum(diag(tab)) / sum(tab)
 
 # Visualization
-ld_df <- data.frame(pred$x, price_class = df_after$price_class)
+ld_df <- data.frame(lda_pred$x, price_class = df_after$price_class)
 ggplot(ld_df, aes(x = LD1, y = LD2, color = price_class)) +
   geom_point(size = 2, alpha = 0.7) +
   theme_minimal() +
@@ -1210,7 +1210,7 @@ best_model <- svm(
 
 
 # --- 7. predict ---
-pred <- predict(best_model, newdata = test)
+svm_pred<- predict(best_model, newdata = test)
 ```
 
 
@@ -1449,12 +1449,12 @@ library(MASS)
 library(ggplot2)
 
 lda_fit <- lda(price_class ~ room_type + neighbourhood_cleansed, data = df_after)
-pred <- predict(lda_fit, newdata = df_after)
+lda_pred <- predict(lda_fit, newdata = df_after)
 
-tab <- table(Predicted = pred$class, True = df_after$price_class)
+tab <- table(Predicted = lda_pred$class, True = df_after$price_class)
 acc <- sum(diag(tab)) / sum(tab)
 
-ld_df <- data.frame(pred$x, price_class = df_after$price_class)
+ld_df <- data.frame(lda_pred$x, price_class = df_after$price_class)
 ggplot(ld_df, aes(x = LD1, y = LD2, color = price_class)) +
   geom_point(size = 2, alpha = 0.7) +
   theme_minimal() +
