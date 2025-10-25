@@ -1479,18 +1479,10 @@ LDA with `room_type` and `neighbourhood_cleansed` captures meaningful signal and
 
 ## Support Vector Machine (SVM, RBF kernel)
 The SVM classifier with an RBF kernel achieved an overall accuracy of 70.1%, indicating a reasonably strong predictive performance across the three price classes. The macro-averaged precision (0.72) and recall (0.69) suggest that the model performs consistently across all categories, without being overly biased toward the majority class. The F1-score (0.70) further confirms a balanced trade-off between precision and recall. As shown in Figure X, most predictions align with the diagonal in the confusion matrix, especially for the middle price range ([150,300)), implying that the model captures the main pricing patterns effectively.However, some misclassification occurs between adjacent ranges (e.g., low vs. mid, mid vs. high).
-```{r}
-svm_model <- train(
-  price_class ~ ., 
-  data = train,
-  method = "svmRadial",
-  trControl = trainControl(method = "cv", number = 5),
-  preProcess = c("center", "scale")
-)
 
-```
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
+conflicts_prefer(yardstick::precision)
 
 # Generate predictions
 pred <- predict(svm_model, newdata = test)
@@ -1507,7 +1499,7 @@ res <- tibble(
 
 acc   <- accuracy(res, truth, .pred_class)
 prec  <- precision(res, truth, .pred_class, estimator = "macro")
-rec   <- recall(res, truth, .pred_class, estimator = "macro")
+rec   <- yardstick::recall(res, truth, .pred_class, estimator = "macro")
 f1    <- f_meas(res, truth, .pred_class, estimator = "macro")
 
 metrics_table <- tibble(
