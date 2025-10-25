@@ -1484,12 +1484,6 @@ The SVM classifier with an RBF kernel achieved an overall accuracy of 70.1%, ind
 ```{r message=FALSE, warning=FALSE, results='hide'}
 conflicts_prefer(yardstick::precision)
 
-# Generate predictions
-pred <- predict(svm_model, newdata = test)
-
-# Check lengths
-length(pred)
-length(test$price_class)
 
 # yardstick 
 res <- tibble(
