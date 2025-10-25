@@ -1488,7 +1488,7 @@ conflicts_prefer(yardstick::precision)
 # yardstick 
 res <- tibble(
   truth = test$price_class,
-  .pred_class = factor(pred, levels = levels(test$price_class))
+  .pred_class = factor(svm_pred, levels = levels(test$price_class))
 )
 
 acc   <- accuracy(res, truth, .pred_class)
