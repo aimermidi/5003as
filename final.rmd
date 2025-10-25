@@ -987,17 +987,18 @@ ggplot(ld_df, aes(x = LD1, y = LD2, color = price_class)) +
 Then we got the result of LDA with a visualized plot, which shows the relation between LD1 and LD2, regarding to the 'price_class'. The detailed evaluation of LDA will be discussed later in the chapter of 'Performance Evaluation'. Next, let's dive into the implementation of KNN.
 
 ## K Nearest Neighbour (kNN)
-The k-Nearest Neighbour (kNN) algorithm is a non-parametric, instance-based learning method that classifies a new sample by the majority class of its k nearest neighbours in the feature space. It does not assume any prior data distribution, making it well-suited for non-linear relationships between predictors and the target variable.
-Given that the Airbnb dataset contains complex, non-linear interactions among numerical and categorical attributes (e.g., room type, number of amenities, and location rating), kNN provides a simple yet effective baseline for identifying patterns in multi-dimensional feature space.
+The k-Nearest Neighbour (kNN) algorithm is a non-parametric, instance-based learning method that classifies a new sample by the majority class of its k nearest neighbours in the feature space. It does not assume any prior data distribution, making it well-suited for non-linear relationships between predictors and the target variable.  
+Due to the complex nonlinear relationship between numerical and categorical characteristics in the Airbnb dataset (such as room type, number of amenities, and ratings), this study adopts the k-Nearest Neighbour algorithm (k-NN) as a simple and effective model to identify and learn these potential patterns in the multi-dimensional feature space.  
+The algorithm measures the similarity by calculating the distance between samples without assuming a specific pattern in advance, so it can better adapt to the combination of such nonlinear features.
 
 ### Data Preprocessing
-Since kNN relies on distance-based similarity, all input features were converted to numerical and standardized to comparable scales.  
-The categorical variable room_type was one-hot encoded using caret::dummyVars, ensuring that categorical differences are captured without imposing artificial order.  
-To enhance stability and avoid redundancy in distance calculations, we performed numerical feature screening in three steps:  
+Since kNN measures similarity by the distance between samples, all input features are converted to numerical types and standardized to the same scale.  
+For the categorical variable room_type, one-hot encoding is used to ensure that the model can identify the differences among categories without artificially introducing ordinal relationships.   
+In terms of numerical features, in order to improve the stability of the model and reduce the redundant information in distance calculation, we performed a three-step feature screening.     
 (1) removing near-zero variance features,  
 (2) dropping highly correlated predictors (|ρ| > 0.85), and  
 (3) retaining variables with a moderate Spearman correlation (|ρ| > 0.15) with the target price_class.  
-All numeric variables were then centered and scaled to prevent large-valued features from dominating the Euclidean distance metric.  
+Finally, all numerical features are centered and scaled to prevent the characteristics with larger values from having an unbalanced effect in the calculation of Euclidean distance.
 
 ```{r}
 library(caret)
@@ -1448,9 +1449,9 @@ LDA with `room_type` and `neighbourhood_cleansed` captures meaningful signal and
 
 
 ## K Nearest Neighbour (kNN)
-After tuning the neighbourhood size (k = 27), the final kNN model was tested on the 20% hold-out dataset.
-The model reached an overall accuracy of 0.7079, showing that about 71% of listings were correctly classified into their price range.
-The macro-weighted F1 score (0.7087) and MCC (0.5507) also indicate that the model performed consistently across the three price classes and achieved a balanced prediction between precision and recall.
+After tuning the neighborhood size (k = 27), the final kNN model was evaluated on a 20% independent test set. 
+The results show that the overall accuracy of the model is 0.7079, that is, about 71% of listings are correctly classified into the corresponding price range. 
+The macro-weighted F1 score (0.7087) and MCC (0.5507) also show that the model's performance in three price categories was relatively stable, maintaining a good balance between precision and recall rate.
 ```{r}
 # 1. Independent test set evaluation
 
@@ -1500,11 +1501,10 @@ ggplot(cm_table, aes(x = Reference, y = Prediction, fill = Freq)) +
   )
 ```
 
-From the confusion matrix (Figure X), most listings in the middle price range [150,300) were correctly predicted, while some overlap appeared between neighbouring groups.
-Low-price listings [0,150) were sometimes classified as mid-price, and a few high-price listings [300,+) were also predicted as mid-price.
-This is reasonable because listings close to the price boundaries often share similar features, such as comparable room types or amenities.
-Overall, the kNN model produced stable and reasonable results, effectively identifying listings with similar characteristics while keeping misclassification mainly within adjacent price categories.
-As kNN is a distance-based, non-probabilistic model, probability-based metrics such as ROC-AUC and Brier score were not applicable in this evaluation.
+As shown in the confusion matrix above, most listings in the middle price range [150,300) were correctly classified, and there is still a certain degree of overlap between adjacent categories.  
+Some low-priced listings [0,150) were predicted as mid-priced listings, and a small number of high-priced listings [300,+) were also predicted as mid-priced housing.  
+This situation is understandable, because listings close to the price boundary usually have similar characteristics in terms of room type and number of amenities.  
+Overall, the kNN model shows stable performance, which can effectively identify listings with similar characteristics, and keeps most misclassifications within adjacent price ranges.
 
 ## Support Vector Machine (SVM, RBF kernel)
 The SVM classifier with an RBF kernel achieved an overall accuracy of 70.1%, indicating a reasonably strong predictive performance across the three price classes. The macro-averaged precision (0.72) and recall (0.69) suggest that the model performs consistently across all categories, without being overly biased toward the majority class. The F1-score (0.70) further confirms a balanced trade-off between precision and recall. As shown in Figure X, most predictions align with the diagonal in the confusion matrix, especially for the middle price range ([150,300)), implying that the model captures the main pricing patterns effectively.However, some misclassification occurs between adjacent ranges (e.g., low vs. mid, mid vs. high).
