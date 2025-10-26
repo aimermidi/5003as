@@ -987,13 +987,26 @@ ggplot(ld_df, aes(x = LD1, y = LD2, color = price_class)) +
 Then we got the result of LDA with a visualized plot, which shows the relation between LD1 and LD2, regarding to the 'price_class'. The detailed evaluation of LDA will be discussed later in the chapter of 'Performance Evaluation'. Next, let's dive into the implementation of KNN.
 
 ## K Nearest Neighbour (kNN)
+The k-Nearest Neighbour (kNN) algorithm is a non-parametric, instance-based learning method that classifies a new sample by the majority class of its k nearest neighbours in the feature space. It does not assume any prior data distribution, making it well-suited for non-linear relationships between predictors and the target variable.  
+Due to the complex nonlinear relationship between numerical and categorical characteristics in the Airbnb dataset (such as room type, number of amenities, and ratings), this study adopts the k-Nearest Neighbour algorithm (k-NN) as a simple and effective model to identify and learn these potential patterns in the multi-dimensional feature space.  
+The algorithm measures the similarity by calculating the distance between samples without assuming a specific pattern in advance, so it can better adapt to the combination of such nonlinear features.
+
+### Data Preprocessing
+Since kNN measures similarity by the distance between samples, all input features are converted to numerical types and standardized to the same scale.  
+For the categorical variable room_type, one-hot encoding is used to ensure that the model can identify the differences among categories without artificially introducing ordinal relationships.   
+In terms of numerical features, in order to improve the stability of the model and reduce the redundant information in distance calculation, we performed a three-step feature screening.     
+(1) removing near-zero variance features,  
+(2) dropping highly correlated predictors (|ρ| > 0.85), and  
+(3) retaining variables with a moderate Spearman correlation (|ρ| > 0.15) with the target price_class.  
+Finally, all numerical features are centered and scaled to prevent the characteristics with larger values from having an unbalanced effect in the calculation of Euclidean distance.
+
 ```{r}
 library(caret)
 library(yardstick)
 library(reshape2)
 set.seed(123)
 
-# --- 1. split dataset ---
+# 1. split dataset 
 df <- df_filtered
 df$price_class <- factor(
   df$price_class,
@@ -1049,7 +1062,12 @@ train_filtered <- train_df %>%
 
 test_filtered <- test_df %>%
   select(all_of(selected_vars), price_class)
+```
 
+### Model Tuning and Training
+The model’s hyperparameter, k (number of neighbours), was tuned using 5-fold cross-validation on the training set. A search range from k = 15 to 31 (odd numbers) was tested, and the best value was selected based on classification accuracy.
+After tuning, the final model was retrained on the full training data using the optimal k and subsequently evaluated on the independent 20% test set, which was held out from all model selection procedures.
+```{r}
 # 4. Parameter tuning
 ctrl_inner <- trainControl(method = "cv", number = 5)
 grid_k <- expand.grid(k = seq(15, 31, 2)) 
@@ -1064,7 +1082,6 @@ knn_cv <- train(
 )
 
 best_k <- knn_cv$bestTune$k
-cat("Best k from 5-fold CV:", best_k, "\n")
 
 # 5. Refit the final model with the best k
 best_knn <- train(
@@ -1075,54 +1092,7 @@ best_knn <- train(
   preProcess = c("center", "scale"),
   tuneGrid = data.frame(k = best_k)
 )
-
-# 6. Independent test set evaluation
-
-knn_test_pred <- predict(best_knn, newdata = test_filtered)
-
-
-knn_acc <- mean(knn_test_pred == test_filtered$price_class)
-cat("Test Accuracy:", knn_acc, "\n")
-
-
-cm <- confusionMatrix(
-  data      = knn_test_pred,
-  reference = test_filtered$price_class
-)
-print(cm)
-
-results_df <- data.frame(
-  truth    = test_filtered$price_class,
-  estimate = knn_test_pred
-)
-
-f1_macro <- results_df %>%
-  f_meas(truth = truth, estimate = estimate, estimator = "macro_weighted")
-cat("Macro F1 (weighted):", f1_macro$.estimate, "\n")
-
-mcc_val <- results_df %>%
-  mcc(truth = truth, estimate = estimate)
-cat("MCC:", mcc_val$.estimate, "\n")
-
-# 7. Visualisation: Confusion Matrix Heat Map
-cm_table <- as.data.frame(cm$table)
-colnames(cm_table) <- c("Prediction", "Reference", "Freq")
-
-ggplot(cm_table, aes(x = Reference, y = Prediction, fill = Freq)) +
-  geom_tile(color = "white") +
-  geom_text(aes(label = Freq), size = 4, color = "black") +
-  scale_fill_gradient(low = "#fbe9e7", high = "#d84315") +
-  labs(
-    title = paste0("Confusion Matrix — kNN (k = ", best_k, ")"),
-    x = "True Label (Reference)",
-    y = "Predicted Label"
-  ) +
-  theme_minimal(base_size = 13) +
-  theme(
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    axis.text.x = element_text(angle = 30, hjust = 1)
-  )
-
+cat("Best k from 5-fold CV:", best_k, "\n")
 ```
 
 ## Support Vector Machine (SVM, RBF kernel)
@@ -1479,7 +1449,62 @@ LDA with `room_type` and `neighbourhood_cleansed` captures meaningful signal and
 
 
 ## K Nearest Neighbour (kNN)
+After tuning the neighborhood size (k = 27), the final kNN model was evaluated on a 20% independent test set. 
+The results show that the overall accuracy of the model is 0.7079, that is, about 71% of listings are correctly classified into the corresponding price range. 
+The macro-weighted F1 score (0.7087) and MCC (0.5507) also show that the model's performance in three price categories was relatively stable, maintaining a good balance between precision and recall rate.
+```{r}
+# 1. Independent test set evaluation
 
+knn_test_pred <- predict(best_knn, newdata = test_filtered)
+
+
+knn_acc <- mean(knn_test_pred == test_filtered$price_class)
+
+
+cm <- confusionMatrix(
+  data      = knn_test_pred,
+  reference = test_filtered$price_class
+)
+
+results_df <- data.frame(
+  truth    = test_filtered$price_class,
+  estimate = knn_test_pred
+)
+
+f1_macro <- results_df %>%
+  f_meas(truth = truth, estimate = estimate, estimator = "macro_weighted")
+
+
+mcc_val <- results_df %>%
+  mcc(truth = truth, estimate = estimate)
+cat("Test Accuracy:", knn_acc, "\nMacro F1 (weighted):", f1_macro$.estimate, "\nMCC:", mcc_val$.estimate, "\n")
+
+
+
+# 2. Visualisation: Confusion Matrix Heat Map
+cm_table <- as.data.frame(cm$table)
+colnames(cm_table) <- c("Prediction", "Reference", "Freq")
+
+ggplot(cm_table, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), size = 4, color = "black") +
+  scale_fill_gradient(low = "#fbe9e7", high = "#d84315") +
+  labs(
+    title = paste0("Confusion Matrix — kNN (k = ", best_k, ")"),
+    x = "True Label (Reference)",
+    y = "Predicted Label"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(angle = 30, hjust = 1)
+  )
+```
+
+As shown in the confusion matrix above, most listings in the middle price range [150,300) were correctly classified, and there is still a certain degree of overlap between adjacent categories.  
+Some low-priced listings [0,150) were predicted as mid-priced listings, and a small number of high-priced listings [300,+) were also predicted as mid-priced housing.  
+This situation is understandable, because listings close to the price boundary usually have similar characteristics in terms of room type and number of amenities.  
+Overall, the kNN model shows stable performance, which can effectively identify listings with similar characteristics, and keeps most misclassifications within adjacent price ranges.
 
 ## Support Vector Machine (SVM, RBF kernel)
 The SVM classifier with an RBF kernel achieved an overall accuracy of 70.1%, indicating a reasonably strong predictive performance across the three price classes. The macro-averaged precision (0.72) and recall (0.69) suggest that the model performs consistently across all categories, without being overly biased toward the majority class. The F1-score (0.70) further confirms a balanced trade-off between precision and recall. As shown in Figure X, most predictions align with the diagonal in the confusion matrix, especially for the middle price range ([150,300)), implying that the model captures the main pricing patterns effectively.However, some misclassification occurs between adjacent ranges (e.g., low vs. mid, mid vs. high).
