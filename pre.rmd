@@ -1,0 +1,163 @@
+---
+title: "STAT5003 Project Presentation (TUT10 Group6)"
+author: |
+  Sirui Li (530548597) · Marcus Yao (530688077) · Xi Huang(550902508) <br>
+  Huiwen Jiang（510000080） · Kezhao Wu (540585108)
+date: "`r Sys.Date()`"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      titleSlideClass: center
+      ratio: "16:9"
+      toc: false
+      transition: default
+---
+
+```{r setup, include=FALSE}
+# Minimal setup
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(readr)
+library(stringr)
+```
+
+**Data Cleaning:**
+
+* Robustly load the CSV and treat all columns as text to avoid auto-parsing.
+* Auto-detect the *price* column, clean it to numeric, remove invalid prices (≤0).
+* Detect outliers with Tukey IQR and reduce their influence by winsorizing (3%–97%).
+
+**Why:** reliable numeric target → stable bins & models; winsorize keeps N while limiting extreme influence.
+
+* Keep raw copy of price as `price_orig` to enable reversibility.
+* Winsorization chosen for robustness (preserve N, reduce variance from extremes).
+* bin `price` → `price_class`, encode categoricals, build models.
+
+---
+
+**Code: robust read + auto-detect price + clean → numeric**
+
+```r
+# Robust read: try UTF-8, fallback GB18030, keep all columns as character
+df <- tryCatch(
+  read_csv("listings.csv", col_types = cols(.default = "c")),
+  error = function(e) {
+    message("UTF-8 read failed — retrying with GB18030...")
+    read_csv("listings.csv", locale = locale(encoding = "GB18030"), col_types = cols(.default = "c"))
+  }
+)
+
+if (is.null(df) || nrow(df) == 0) stop("Failed to load listings.csv or file is empty.")
+
+# Auto-detect price column (case-insensitive keyword search)
+possible_cols <- names(df)
+price_col <- possible_cols[str_detect(tolower(possible_cols), "price")][1]
+if (is.na(price_col)) {
+  # fallback: search for synonyms
+  price_keywords <- c("cost","amount","value","fee","charge","payment")
+  for (kw in price_keywords) {
+    price_col <- possible_cols[str_detect(tolower(possible_cols), kw)][1]
+    if (!is.na(price_col)) break
+  }
+}
+if (is.na(price_col)) stop("Could not find a price-like column.")
+
+# Show which column we picked
+cat("Detected price column:", price_col, "\n")
+
+# Clean price string -> numeric (strip currency & thousands separators)
+df <- df %>%
+  mutate(
+    !!sym(price_col) := as.numeric(
+      str_remove_all(
+        str_remove_all(tolower(.data[[price_col]]), ","),
+        "[^\\d.-]"
+      )
+    )
+  )
+
+# Filter invalid or non-positive prices
+df <- df %>% filter(!is.na(.data[[price_col]]) & .data[[price_col]] > 0)
+
+# Quick preview
+cat("After cleaning, rows:", nrow(df), "\n")
+print(head(df %>% select(all_of(price_col)), 6))
+```
+
+---
+
+**Code: compute IQR, identify outliers, winsorize (3%–97%), save cleaned file**
+
+```r
+# IQR fence
+q1 <- quantile(df[[price_col]], 0.25, na.rm = TRUE)
+q3 <- quantile(df[[price_col]], 0.75, na.rm = TRUE)
+iqr <- q3 - q1
+lower_fence <- q1 - 1.5 * iqr
+upper_fence <- q3 + 1.5 * iqr
+
+# Count outliers
+outlier_count <- sum(df[[price_col]] < lower_fence | df[[price_col]] > upper_fence, na.rm = TRUE)
+cat("IQR outliers detected:", outlier_count, "of", nrow(df), "rows\n")
+
+# Winsorize at 3%–97% quantiles (keep rows, limit extremes)
+p_lo <- quantile(df[[price_col]], 0.03, na.rm = TRUE)
+p_hi <- quantile(df[[price_col]], 0.97, na.rm = TRUE)
+
+df <- df %>%
+  mutate(
+    !!sym(paste0(price_col, "_orig")) := .data[[price_col]],
+    !!sym(price_col) := pmin(pmax(.data[[price_col]], p_lo), p_hi),
+    .clipped_low  = .data[[paste0(price_col, "_orig")]] < p_lo,
+    .clipped_high = .data[[paste0(price_col, "_orig")]] > p_hi
+  )
+
+# Summary of winsorization
+clipped_total <- sum(df$.clipped_low | df$.clipped_high, na.rm = TRUE)
+cat("Winsorized rows:", clipped_total, "(", round(100 * clipped_total / nrow(df), 2), "% )\n")
+cat("P3:", round(p_lo,2), " P97:", round(p_hi,2), "\n")
+
+# Save cleaned data (overwrite or write into working dir)
+write_csv(df, "cleaned_data.csv")
+cat("Cleaned data written to cleaned_data.csv\n")
+```
+
+---
+## LDA Visualization
+![LDA Projection](LDA_Projection.png)
+
+---
+
+## 📊 Evaluation1: Performance Overview and Obeserved Pattern
+
+| Metric | Value | Interpretation |
+| :--- | :--- | :--- |
+| **Overall Accuracy** | **~60%** | Substantially better than chance (~33%), but shows a meaningful error rate (~40% misclassification). |
+| **Macro-F1** | [macroF1] | Unweighted average of per-class F1, reflecting balanced classification quality. |
+| **Multiclass MCC** | [mcc\_val] | A balanced measure of multi-class classification quality. |
+
+> **Conclusion:** The model demonstrates **moderate discriminative performance** on the price classification task.
+
+* **The Middle Class Problem:** The largest class, `[150,300)`, is often predicted correctly, but acts as a major **absorber of errors** from both lower and higher price bands.
+    * Many low-price (`[0,150)`) and high-price (`[300,+)`) listings are incorrectly pulled into this ambiguous middle range.
+* **Highest Class Challenge:** The `[300,+)` price category exhibits the lowest recall, as a significant portion is confused with the intermediate `[150,300)` class.
+* **Inherent Difficulty:** This pattern is typical when target classes are adjacent price bands with inherently fuzzy boundaries.
+
+---
+
+## 🧠 Evaluation 2: LDA Signal Captured & Discussion
+* **Dominant Discriminant Axis:** **LD1** explains approximately **[prop_trace]** of the variance, indicating a single dominant linear direction is responsible for separating the classes.
+* **Feature Drivers:** LDA yields highly **interpretable linear coefficients** that clearly show the influence of specific `neighbourhood_cleansed` levels and `room_type` categories.
+    * **Positive Loadings (LD1):** Features like high-end neighbourhoods (`Pittwater`, `Mosman`) push listings toward higher discriminant scores (higher price classes).
+    * **Qualitative Insight:** The model successfully supports **qualitative** conclusions regarding the importance of location and room type for price.
+
+1.  **Insufficient Predictor Set:** The model is limited to only two categorical features (`room_type`, `neighbourhood_cleansed`).
+    * **Missing Price Drivers:** Crucial numerical factors (e.g., number of guests, bedrooms, review scores, amenities) are absent, limiting the model's ability to make fine-grained price distinctions.
+2.  **Violation of LDA Assumptions:**
+    * The input consists primarily of **sparse, high-dimensional dummy variables** (from `neighbourhood_cleansed`), which severely violates LDA’s assumptions of **multivariate normality** and **equal covariance matrices**.
+    * This mismatch degrades performance and potentially biases the discriminant axes.
+3.  **Conclusion:** LDA provides valuable **interpretive insights** into feature contributions. However, due to the limited predictor set and assumption violations, its **quantitative predictive performance is moderate**. Let's see how several other models perform on this classification problem.
