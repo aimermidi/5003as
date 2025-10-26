@@ -25,6 +25,117 @@ library(readr)
 library(stringr)
 ```
 
+
+
+
+# 1️⃣ Project Topic
+
+**Project Title:**  
+A brief, catchy title for your data project.
+
+**Overview:**  
+- What is your project about?  
+- Why did you choose this topic?
+
+---
+
+# 2️⃣ Research Question & Why It Matters
+
+**Research Question:**  
+> e.g. “How do Airbnb room types and locations influence price?”
+
+**Motivation:**  
+- Why is this question important to society / business / people?  
+- What inspired your group to study it?
+
+---
+
+# 3️⃣ Data Processing
+
+**Data Source:**  
+- Source (e.g., Kaggle, ABS, API, CSV dataset)  
+- Data size / structure  
+
+**Steps:**  
+1. Data cleaning (missing values, duplicates)  
+2. Feature selection or transformation  
+3. Tools used (e.g., `dplyr`, `ggplot2`)
+
+```{r, echo=FALSE, message=FALSE}
+library(ggplot2)
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  theme_minimal() +
+  labs(title="Example Data Plot", x="Weight", y="Miles per Gallon")
+```
+
+---
+
+#4️⃣ What Does Your Data Look Like?
+
+Exploratory Analysis:
+
+Summary statistics
+
+Key distributions
+
+Interesting patterns
+```{r}
+summary(mtcars)
+
+```
+---
+#5️⃣ Model(s) Used & Why
+
+Chosen Model(s):
+
+e.g., SVM, Linear Regression, Decision Tree
+
+Why it fits your problem
+
+Parameter tuning (briefly)
+
+Training & Evaluation:
+
+Accuracy, RMSE, etc.
+```{r}
+plot(pressure)
+
+```
+---
+#6️⃣ Key Results & Visuals
+
+Highlight key findings visually
+
+Chart 1: model results
+
+Chart 2: comparison
+
+Simple explanations under each chart
+
+```{r}
+ggplot(mtcars, aes(factor(cyl), mpg)) +
+geom_boxplot(fill="lightblue") +
+labs(title="Fuel Efficiency by Cylinder Count")
+
+```
+---
+#7️⃣ Final Insights & Reflection
+
+What have you learned?
+
+Key takeaways
+
+Any surprises?
+
+What would you improve if you had more time?
+
+Link back to your research question
+Does your result answer the question clearly?
+
+
+
+---
 **Data Cleaning:**
 
 * Robustly load the CSV and treat all columns as text to avoid auto-parsing.
