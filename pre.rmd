@@ -162,16 +162,40 @@ Highlight key findings visually
 
 Chart 1: model results
 
+
+```{r fig.align='center', fig.width=7, fig.height=4, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+
+model_results <- data.frame(
+  Model = c("Logistic Regression", "LDA", "KNN", "SVM (RBF)", "Random Forest"),
+  Accuracy = c(0.58, 0.55, 0.61, 0.64, 0.68)
+)
+
+
+ggplot(model_results, aes(x = reorder(Model, Accuracy), y = Accuracy)) +
+  geom_col(fill = "#66b3ff", width = 0.6) +
+  geom_text(aes(label = paste0(round(Accuracy * 100, 1), "%")),
+            vjust = -0.5, size = 4.2, fontface = "bold") +
+  labs(
+    title = "Model Accuracy Comparison",
+    x = "Model",
+    y = "Accuracy"
+  ) +
+  ylim(0, 0.8) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+
+
+```
+---
 Chart 2: comparison
 
 Simple explanations under each chart
 
-```{r}
-ggplot(mtcars, aes(factor(cyl), mpg)) +
-geom_boxplot(fill="lightblue") +
-labs(title="Fuel Efficiency by Cylinder Count")
-
-```
 ---
 #7️⃣ Final Insights & Reflection
 
@@ -199,7 +223,6 @@ Our results partly answer the research question — price category prediction is
 **Appendix: Data Processing Code: robust read + auto-detect price + clean → numeric**
 
 ```{r}
-
 # Robust read: try UTF-8, fallback GB18030, keep all columns as character
 df <- tryCatch(
   read_csv("listings.csv", col_types = cols(.default = "c")),
@@ -245,7 +268,7 @@ df <- df %>% filter(!is.na(.data[[price_col]]) & .data[[price_col]] > 0)
 cat("After cleaning, rows:", nrow(df), "\n")
 print(head(df %>% select(all_of(price_col)), 6))
 ```
-```
+
 
 
 ---
