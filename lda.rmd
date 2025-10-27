@@ -1,0 +1,35 @@
+---
+## LDA Visualization
+![LDA Projection](LDA_Projection.png)
+
+---
+
+## 📊 Evaluation1: Performance Overview and Obeserved Pattern
+
+| Metric | Value | Interpretation |
+| :--- | :--- | :--- |
+| **Overall Accuracy** | **~60%** | Substantially better than chance (~33%), but shows a meaningful error rate (~40% misclassification). |
+| **Macro-F1** | [macroF1] | Unweighted average of per-class F1, reflecting balanced classification quality. |
+| **Multiclass MCC** | [mcc\_val] | A balanced measure of multi-class classification quality. |
+
+> **Conclusion:** The model demonstrates **moderate discriminative performance** on the price classification task.
+
+* **The Middle Class Problem:** The largest class, `[150,300)`, is often predicted correctly, but acts as a major **absorber of errors** from both lower and higher price bands.
+    * Many low-price (`[0,150)`) and high-price (`[300,+)`) listings are incorrectly pulled into this ambiguous middle range.
+* **Highest Class Challenge:** The `[300,+)` price category exhibits the lowest recall, as a significant portion is confused with the intermediate `[150,300)` class.
+* **Inherent Difficulty:** This pattern is typical when target classes are adjacent price bands with inherently fuzzy boundaries.
+
+---
+
+## 🧠 Evaluation 2: LDA Signal Captured & Discussion
+* **Dominant Discriminant Axis:** **LD1** explains approximately **[prop_trace]** of the variance, indicating a single dominant linear direction is responsible for separating the classes.
+* **Feature Drivers:** LDA yields highly **interpretable linear coefficients** that clearly show the influence of specific `neighbourhood_cleansed` levels and `room_type` categories.
+    * **Positive Loadings (LD1):** Features like high-end neighbourhoods (`Pittwater`, `Mosman`) push listings toward higher discriminant scores (higher price classes).
+    * **Qualitative Insight:** The model successfully supports **qualitative** conclusions regarding the importance of location and room type for price.
+
+1.  **Insufficient Predictor Set:** The model is limited to only two categorical features (`room_type`, `neighbourhood_cleansed`).
+    * **Missing Price Drivers:** Crucial numerical factors (e.g., number of guests, bedrooms, review scores, amenities) are absent, limiting the model's ability to make fine-grained price distinctions.
+2.  **Violation of LDA Assumptions:**
+    * The input consists primarily of **sparse, high-dimensional dummy variables** (from `neighbourhood_cleansed`), which severely violates LDA’s assumptions of **multivariate normality** and **equal covariance matrices**.
+    * This mismatch degrades performance and potentially biases the discriminant axes.
+3.  **Conclusion:** LDA provides valuable **interpretive insights** into feature contributions. However, due to the limited predictor set and assumption violations, its **quantitative predictive performance is moderate**. Let's see how several other models perform on this classification problem.
