@@ -158,7 +158,6 @@ class: incremental
 ---
 #6️⃣ Key Results & Visuals
 
-Highlight key findings visually
 
 Chart 1: model  results
 
@@ -188,7 +187,7 @@ kable(results, "html", digits = 3,
 ```
 
 ---
-
+<!--chart 2
 ```{r fig.align='center', fig.width=7, fig.height=4, echo=FALSE, message=FALSE, warning=FALSE}
 library(ggplot2)
 library(dplyr)
@@ -217,9 +216,7 @@ ggplot(model_results, aes(x = reorder(Model, Accuracy), y = Accuracy)) +
 
 
 ```
-
-
----
+!-->
 #7️⃣ Final Insights & Reflection
 
 ##What have you learned?
