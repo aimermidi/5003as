@@ -162,11 +162,11 @@ class: incremental
 Chart 1: model  results
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-# 加载包
+
 library(knitr)
 library(kableExtra)
 
-# 真实结果数据（提取自 final.html）
+#
 results <- data.frame(
   Model = c("LDA", "Logistic Regression", "KNN", "SVM (RBF Kernel)", "Random Forest"),
   Accuracy = c(0.574, 0.602, 0.635, 0.701, 0.728),
@@ -176,7 +176,6 @@ results <- data.frame(
   MCC = c(NA, 0.46, 0.51, 0.58, NA)
 )
 
-# 生成表格
 kable(results, "html", digits = 3,
       caption = "Table 1: Model Performance Summary (Extracted from Final Report)") %>%
   kable_styling(full_width = FALSE, position = "center",
