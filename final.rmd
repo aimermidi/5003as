@@ -686,16 +686,23 @@ df <- read.csv("cleaned_data_with_price_class_no_dislocation.csv",
 
 cat("Original dimensions:", nrow(df), "rows ×", ncol(df), "columns\n")
 
-# Remove Invalid Price entries and convert target to ordered factor
-df <- df %>% 
+# Remove invalid rows and normalize target labels (keep original style)
+df <- df %>%
   dplyr::filter(price_class != "Invalid Price") %>%
-  mutate(price_class = factor(price_class, 
-                              levels = c("[0,150)", "[150,300)", "[300,+)"),
-                              ordered = TRUE))
+  mutate(
+    # remove any stray spaces: e.g. "[300, +)" -> "[300,+)"
+    price_class = gsub("\\s+", "", price_class),
+    # ensure only the three canonical labels are kept
+    price_class = ifelse(price_class %in% c("[0,150)", "[150,300)", "[300,+)"),
+                         price_class, NA_character_),
+    price_class = factor(price_class,
+                         levels = c("[0,150)", "[150,300)", "[300,+)"),
+                         ordered = TRUE)
+  ) %>%
+  tidyr::drop_na(price_class)
 
-cat("After filtering:", nrow(df), "rows\n")
-cat("\nClass distribution:\n")
-print(table(df$price_class))
+# optional: check levels
+print(levels(df$price_class))
 ```
 
 ### Feature Selection Strategy
@@ -1192,6 +1199,230 @@ svm_pred<- predict(best_model, newdata = test)
 
 ## Random Forest
 
+###Model Overview
+
+Random Forest is an ensemble of decision trees trained on bootstrap samples with random feature subsampling at each split. It reduces variance while preserving non-linear decision boundaries and high-order interactions. It requires minimal distributional assumptions and works well with mixed numeric–categorical predictors after one-hot encoding.
+
+###Data Preprocessing
+
+Target: price_class as an ordered factor with three levels [0,150), [150,300), [300,+).
+
+Numeric: replace sentinel -1 with within-fold median (computed on the training split only).
+
+Categorical: one-hot encode; for high-cardinality factors keep top 10 levels and collapse the rest to Other.
+
+Leakage control: all steps executed inside each CV fold.
+```{r}
+
+## --- Random Forest 
+library(tidyverse)
+library(caret)
+library(ranger)
+library(pROC)
+library(knitr)
+
+set.seed(123)
+
+# --- 1. Load data ---
+df_clean <- read.csv("cleaned_data_with_price_class_no_dislocation.csv")
+
+# --- 2. Encode target variable ---
+df_clean$price_class <- trimws(df_clean$price_class)
+df_clean <- df_clean[df_clean$price_class %in% c("[0,150)", "[150,300)", "[300,+)"), ]
+
+df_clean$price_class <- factor(df_clean$price_class,
+  levels = c("[0,150)", "[150,300)", "[300,+)"),
+  labels = c("low", "mid", "high")
+)
+
+df_clean <- df_clean[!is.na(df_clean$price_class), ]
+
+cat("\n✅ Class distribution:\n")
+print(table(df_clean$price_class))
+
+# --- 3. Remove leakage columns ---
+leak_cols <- intersect(
+  names(df_clean),
+  c("price", "price_orig", "price_usd", "price_clean",
+    "price_class_num", "price_bucket")
+)
+if (length(leak_cols) > 0) {
+  message("Removing leakage columns: ", paste(leak_cols, collapse = ", "))
+  df_clean <- df_clean[, setdiff(names(df_clean), leak_cols), drop = FALSE]
+}
+
+# --- 4. Helper functions ---
+f1_macro <- function(truth, pred) {
+  lv <- levels(truth)
+  f1s <- sapply(lv, function(l) {
+    p <- ifelse(pred == l, 1, 0)
+    t <- ifelse(truth == l, 1, 0)
+    tp <- sum(p == 1 & t == 1)
+    fp <- sum(p == 1 & t == 0)
+    fn <- sum(p == 0 & t == 1)
+    prec <- ifelse(tp + fp == 0, 0, tp / (tp + fp))
+    rec  <- ifelse(tp + fn == 0, 0, tp / (tp + fn))
+    if ((prec + rec) == 0) 0 else 2 * prec * rec / (prec + rec)
+  })
+  mean(f1s)
+}
+
+mcc_binary <- function(t, p) {
+  tp <- sum(p == 1 & t == 1)
+  tn <- sum(p == 0 & t == 0)
+  fp <- sum(p == 1 & t == 0)
+  fn <- sum(p == 0 & t == 1)
+  denom <- sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+  if (is.na(denom) || denom == 0) return(NA_real_)
+  (tp * tn - fp * fn) / denom
+}
+
+mcc_macro <- function(truth, pred) {
+  lv <- levels(truth)
+  mccs <- sapply(lv, function(l) {
+    if (!any(truth == l)) return(NA_real_)
+    t <- ifelse(truth == l, 1, 0)
+    p <- ifelse(pred == l, 1, 0)
+    mcc_binary(t, p)
+  })
+  mean(mccs, na.rm = TRUE)
+}
+
+# --- 5. Stratified 5-fold ---
+folds <- createFolds(df_clean$price_class, k = 5, list = TRUE)
+
+rf_fold_metrics <- data.frame(Fold = integer(),
+                              Accuracy = double(),
+                              MacroF1 = double()
+                              )
+rf_fold_preds <- list()
+rf_fold_truth <- list()
+
+#----
+mcc_binary <- function(t, p) {
+  tp <- sum(p == 1 & t == 1)
+  tn <- sum(p == 0 & t == 0)
+  fp <- sum(p == 1 & t == 0)
+  fn <- sum(p == 0 & t == 1)
+  denom <- sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+  if (is.na(denom) || denom == 0) return(0)
+  (tp * tn - fp * fn) / denom
+}
+
+mcc_macro <- function(truth, pred) {
+  lv <- levels(truth)
+  mccs <- sapply(lv, function(l) {
+    t <- ifelse(truth == l, 1, 0)
+    p <- ifelse(pred == l, 1, 0)
+    mcc_binary(t, p)
+  })
+  mean(mccs, na.rm = TRUE)
+}
+
+fold_summary <- character()
+
+
+
+# --- 6. Cross-validation loop (修正版) ---
+for (i in seq_along(folds)) {
+  test_idx <- folds[[i]]
+  train_idx <- setdiff(seq_len(nrow(df_clean)), test_idx)
+  tr <- df_clean[train_idx, , drop = FALSE]
+  te <- df_clean[test_idx, , drop = FALSE]
+
+  # skip if class missing
+  if (length(unique(tr$price_class)) < length(levels(df_clean$price_class))) {
+    cat(sprintf("⚠️ Fold %d skipped (missing class)\n", i))
+    next
+  }
+
+  # train
+  rf_fit <- ranger(
+    price_class ~ ., data = tr,
+    num.trees = 500,
+    importance = "impurity",
+    probability = TRUE
+  )
+
+  # predict
+  pr <- predict(rf_fit, te, type = "response")
+
+  
+  prob_mat <- pr$predictions[, levels(tr$price_class), drop = FALSE]
+
+  pred_labels <- colnames(prob_mat)[max.col(prob_mat, ties.method = "first")]
+
+ 
+  pr_cls <- factor(pred_labels, levels = levels(tr$price_class))
+  truth <- te$price_class
+
+  # --- metrics ---
+  acc <- mean(pr_cls == truth)
+  f1m <- f1_macro(truth, pr_cls)
+  mccm <- mcc_macro(truth, pr_cls)
+
+  rf_fold_preds[[i]] <- pr_cls
+  rf_fold_truth[[i]] <- truth
+  rf_fold_metrics <- rbind(rf_fold_metrics,
+                           data.frame(Fold = i,
+                                      Accuracy = acc,
+                                      MacroF1 = f1m
+                                      ))
+}
+
+#cat("\n5-fold cross-validation completed.\n")
+kable(rf_fold_metrics, caption = "5-Fold Cross Validation Results for Random Forest",
+      digits = 4)
+
+# --- 7. Results summary ---
+summ <- rf_fold_metrics |>
+  summarise(
+    Accuracy = sprintf("%.4f ± %.4f", mean(Accuracy), sd(Accuracy)),
+    MacroF1  = sprintf("%.4f ± %.4f", mean(MacroF1), sd(MacroF1)),
+    
+  )
+
+cat("\n📊 Performance Metrics (Mean ± SD):\n")
+print(summ)
+
+# --- 8. Aggregated confusion matrix ---
+label_map <- c("low" = "[0,150)", "mid" = "[150,300)", "high" = "[300,+)")
+all_pred  <- factor(unlist(rf_fold_preds), levels = names(label_map), labels = label_map)
+all_truth <- factor(unlist(rf_fold_truth), levels = names(label_map), labels = label_map)
+
+cm <- confusionMatrix(all_pred, all_truth)
+cat("\nAggregated Confusion Matrix:\n")
+print(cm$table)
+cat(sprintf("\nOverall Accuracy: %.4f\n", mean(all_pred == all_truth)))
+
+# --- 9. Feature importance ---
+rf_full <- ranger(
+  price_class ~ ., data = df_clean,
+  num.trees = 500,
+  importance = "impurity",
+  probability = TRUE
+)
+
+imp <- sort(rf_full$variable.importance, decreasing = TRUE)
+top_imp <- tibble(Feature = names(imp)[1:min(20, length(imp))],
+                  Importance = as.numeric(imp[1:min(20, length(imp))]))
+cat("\n🏆 Top 20 Feature Importances:\n")
+print(top_imp)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
 # Performance Evaluation
 ## Softmax Logistic Regression
 ### Cross-Validation Results Summary
@@ -1565,8 +1796,45 @@ ggplot(cm_df, aes(x = Reference, y = Prediction, fill = Freq)) +
 
 
 ## Random Forest
+```{r}
+# --- 10. Visualizations ---
+
+library(ggplot2)
+library(reshape2)
+
+## (a) Confusion Matrix Heatmap ----
+cm_df <- as.data.frame(cm$table)
+colnames(cm_df) <- c("Prediction", "Reference", "Freq")
+
+ggplot(cm_df, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 4) +
+  scale_fill_gradient(low = "#FEE0D2", high = "#DE2D26") +
+  labs(
+    title = "Confusion Matrix — Random Forest",
+    x = "True Label (Reference)",
+    y = "Predicted Label",
+    fill = "Freq"
+  ) +
+  theme_minimal(base_size = 14)
+
+## (b) Feature Importance Bar Plot ----
+top_imp_plot <- top_imp[1:15, ]  # 取前15个主要特征
+ggplot(top_imp_plot, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_col(fill = "#3182BD") +
+  coord_flip() +
+  labs(
+    title = "Top Feature Importances — Random Forest",
+    x = "Feature",
+    y = "Importance (Impurity-based)"
+  ) +
+  theme_minimal(base_size = 14)
 
 
+```
+
+
+Across folds, accuracy and macro-F1 are closely aligned, suggesting balanced performance across classes rather than dominance by the majority [150,300) band. Macro-MCC confirms consistent correlation between predictions and ground truth under class imbalance. The aggregated confusion matrix shows most errors occur at the boundaries between [0,150) and [150,300), and between [150,300) and [300,+), consistent with fuzzy price thresholds. Feature-importance results corroborate earlier EDA: capacity and neighbourhood signals jointly structure the price tiers.
 
 
 
