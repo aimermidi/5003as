@@ -32,37 +32,46 @@ library(stringr)
 # 1️⃣ Project Topic
 
 **Project Title:**  
-A brief, catchy title for your data project.
+Building a Multi-Class Classification Model for Intelligent Price Category Prediction
 
-**Overview:**  
-- What is your project about?  
-- Why did you choose this topic?
+**What is the project about?**  
+Using **Sydney Airbnb data** to classify listing prices into discrete categories
+
+**Why did we choose this topic?**  
+> Predicting precise price is inaccurate  
+> Predicting price range is more practical  
+> A classification approach fits this real-world problem
 
 ---
 
 # 2️⃣ Research Question & Why It Matters
 
 **Research Question:**  
-> e.g. “How do Airbnb room types and locations influence price?”
+> How can we accurately predict a property's **price category** (Low, Medium, or High) based on its core features?
 
-**Motivation:**  
-- Why is this question important to society / business / people?  
-- What inspired your group to study it?
+**Why it matters?**  
+- **For Travelers:** Quick budget filtering to find affordable accommodation  
+- **For Hosts:** Market insights to optimize pricing and maximize revenue
 
 ---
 
 # 3️⃣ Data Processing
 
+**Data Cleaning: What we did**
+
+* Robustly load the CSV and treat all columns as text to avoid auto-parsing.
+* Auto-detect the *price* column, clean it to numeric, remove invalid prices (≤0).
+* Detect outliers with Tukey IQR and reduce their influence by winsorizing (3%–97%).
+
+**Why:** reliable numeric target → stable bins & models; winsorize keeps N while limiting extreme influence.
+
+* Keep raw copy of price as `price_orig` to enable reversibility.
+* Winsorization chosen for robustness (preserve N, reduce variance from extremes).
+* bin `price` → `price_class`, encode categoricals, build models.
+
 **Data Source:**  
-- Source (e.g., Kaggle, ABS, API, CSV dataset)  
-- Data size / structure  
-
-**Steps:**  
-1. Data cleaning (missing values, duplicates)  
-2. Feature selection or transformation  
-3. Tools used (e.g., `dplyr`, `ggplot2`)
-
-
+- Source: Sydney Airbnb 
+- Data size: 18187 observations of 79 variables  
 
 ---
 
@@ -81,7 +90,7 @@ Interesting patterns
 ```
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
+#5️⃣ Models Used & Why
 ## Softmax Logistic Regression
 
 
@@ -96,7 +105,7 @@ class: incremental
 
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
+#5️⃣ Models Used & Why
 ## LDA (Linear Discriminant Analysis)
 
 - Projects data to **maximize separation** between price classes  
@@ -108,7 +117,7 @@ class: incremental
 
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
+#5️⃣ Models Used & Why
 ## K-Nearest Neighbour (kNN)
 
 
@@ -120,7 +129,7 @@ class: incremental
 
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
+#5️⃣ Models Used & Why
 ## Support Vector Machine (SVM, RBF Kernel)
 
 
@@ -136,18 +145,15 @@ $$
 
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
-## Softmax Logistic Regression
+#5️⃣ Models Used & Why
+## Random Forest
 
 
-- **Baseline model** for the multi-class price classification task  
-- Uses the **Softmax function** to estimate the probability of price classes 
-
-![](pre_files/figure-html/softmax formula.png)
-
-- A **linear** and **interpretable** model — coefficients show the direction and strength of each feature’s influence  
-- Works well since most features have roughly **linear relationships** with price  
-- Trained using **5-fold cross-validation** and **one-hot encoding** for stable and reliable performance  
+- **Ensemble** of multiple decision trees  
+- Trained on **bootstrap samples** with random feature selection  
+- Captures **non-linear interactions** and reduces variance  
+- Works well for **mixed numeric & categorical** Airbnb features  
+- Tuned via **5-fold cross-validation**; analyzed **feature importance**  
 
 ---
 #6️⃣ Key Results & Visuals
@@ -180,24 +186,9 @@ What would you improve if you had more time?
 Link back to your research question
 Does your result answer the question clearly?
 
-
-
----
-**Data Cleaning:**
-
-* Robustly load the CSV and treat all columns as text to avoid auto-parsing.
-* Auto-detect the *price* column, clean it to numeric, remove invalid prices (≤0).
-* Detect outliers with Tukey IQR and reduce their influence by winsorizing (3%–97%).
-
-**Why:** reliable numeric target → stable bins & models; winsorize keeps N while limiting extreme influence.
-
-* Keep raw copy of price as `price_orig` to enable reversibility.
-* Winsorization chosen for robustness (preserve N, reduce variance from extremes).
-* bin `price` → `price_class`, encode categoricals, build models.
-
 ---
 
-**Code: robust read + auto-detect price + clean → numeric**
+**Appendix: Data Processing Code: robust read + auto-detect price + clean → numeric**
 
 ```r
 # Robust read: try UTF-8, fallback GB18030, keep all columns as character
