@@ -160,38 +160,9 @@ class: incremental
 
 Highlight key findings visually
 
-Chart 1: model results
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-
-library(knitr)
-library(kableExtra)
+Chart 1: model  results
 
 
-results <- data.frame(
-  Model = c("LDA", "Logistic Regression", "KNN", "SVM (RBF Kernel)", "Random Forest"),
-  Accuracy = c(0.574, 0.602, 0.635, 0.701, 0.728),
-  Precision = c(0.56, 0.61, 0.64, 0.72, 0.74),
-  Recall = c(0.57, 0.60, 0.63, 0.69, 0.72),
-  F1_Score = c(0.55, 0.59, 0.62, 0.70, 0.71),
-  MCC = c(NA, 0.46, 0.51, 0.58, NA)
-)
-
-
-kable(results, "html", digits = 3,
-      caption = "Table 1: Model Performance Summary (Extracted from Final Report)") %>%
-  kable_styling(full_width = FALSE, position = "center",
-                bootstrap_options = c("striped", "hover", "condensed")) %>%
-  row_spec(5, bold = TRUE, color = "white", background = "#66b3ff") %>%   # 高亮 Random Forest
-  column_spec(2:6, width = "8em") %>%
-  add_header_above(c(" " = 1, "Performance Metrics" = 5))
-
-```
-
----
-Chart 2: comparison
-
-Simple explanations under each chart
 ```{r fig.align='center', fig.width=7, fig.height=4, echo=FALSE, message=FALSE, warning=FALSE}
 library(ggplot2)
 library(dplyr)
@@ -220,9 +191,9 @@ ggplot(model_results, aes(x = reorder(Model, Accuracy), y = Accuracy)) +
 
 
 ```
+---a
+
 ---
-
-
 #7️⃣ Final Insights & Reflection
 
 ##What have you learned?
