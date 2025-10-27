@@ -175,22 +175,31 @@ labs(title="Fuel Efficiency by Cylinder Count")
 ---
 #7️⃣ Final Insights & Reflection
 
-What have you learned?
+##What have you learned?
+We learned that classification can effectively group Airbnb listings into price ranges using structured and textual features. Even simple models like Logistic Regression can perform reasonably well when the data is well-cleaned and encoded.
 
-Key takeaways
+##Key takeaways
+Proper data cleaning (especially outlier winsorization) has a big impact on model stability.
 
-Any surprises?
+Location and room type are consistently strong predictors of price.
 
-What would you improve if you had more time?
+Ensemble models like Random Forest achieve the best balance between accuracy and interpretability.
 
-Link back to your research question
-Does your result answer the question clearly?
+
+
+---
+##What would we improve if we had more time?
+We would include more numerical and textual predictors (e.g., number of guests, review scores, amenities, host experience) and explore feature engineering to capture richer signals. We would also test deep learning or boosted tree models for potentially better performance.
+
+##Link back to our research question
+Our results partly answer the research question — price category prediction is feasible with moderate accuracy (~60%), proving that Airbnb listings contain sufficient structured signals to estimate value bands. However, more comprehensive features and better class balance could further improve the performance and practical usability.
 
 ---
 
 **Appendix: Data Processing Code: robust read + auto-detect price + clean → numeric**
 
-```r
+```{r}
+
 # Robust read: try UTF-8, fallback GB18030, keep all columns as character
 df <- tryCatch(
   read_csv("listings.csv", col_types = cols(.default = "c")),
@@ -236,6 +245,8 @@ df <- df %>% filter(!is.na(.data[[price_col]]) & .data[[price_col]] > 0)
 cat("After cleaning, rows:", nrow(df), "\n")
 print(head(df %>% select(all_of(price_col)), 6))
 ```
+```
+
 
 ---
 
