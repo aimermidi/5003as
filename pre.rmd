@@ -6,6 +6,7 @@ author: |
 date: "`r Sys.Date()`"
 output:
   xaringan::moon_reader:
+    mathjax: "default"
     lib_dir: libs
     nature:
       highlightStyle: github
@@ -85,23 +86,75 @@ summary(mtcars)
 
 ```
 ---
+class: incremental
 #5️⃣ Model(s) Used & Why
+## Softmax Logistic Regression
 
-Chosen Model(s):
 
-e.g., SVM, Linear Regression, Decision Tree
+- **Baseline model** for the multi-class price classification task  
+- Uses the **Softmax function** to estimate the probability of price classes 
 
-Why it fits your problem
+![](pre_files/figure-html/softmax formula.png)
 
-Parameter tuning (briefly)
+- A **linear** and **interpretable** model — coefficients show the direction and strength of each feature’s influence  
+- Works well since most features have roughly **linear relationships** with price  
+- Trained using **5-fold cross-validation** and **one-hot encoding** for stable and reliable performance  
 
-Training & Evaluation:
+---
+class: incremental
+#5️⃣ Model(s) Used & Why
+## LDA (Linear Discriminant Analysis)
 
-Accuracy, RMSE, etc.
-```{r}
-plot(pressure)
+- Projects data to **maximize separation** between price classes  
+- Assumes **Gaussian-distributed classes** with similar covariance  
+- Suitable for **moderate, structured data** with categorical variables  
+- Reveals **key factors** like *room type* and *neighbourhood* affecting price  
+- Tests whether **linear boundaries** can classify prices effectively  
 
-```
+
+---
+class: incremental
+#5️⃣ Model(s) Used & Why
+## K-Nearest Neighbour (kNN)
+
+
+- A **non-parametric** model that classifies by **majority vote** of nearest samples  
+- Captures **non-linear relationships** between price and features  
+- Works well with **mixed numeric & categorical data** after standardization  
+- Requires tuning of **k** to balance bias–variance trade-off  
+- Serves as a **simple benchmark** for complex non-linear models  
+
+---
+class: incremental
+#5️⃣ Model(s) Used & Why
+## Support Vector Machine (SVM, RBF Kernel)
+
+
+- Finds an **optimal hyperplane** that maximizes class separation  
+- Uses **RBF kernel** to capture **non-linear relationships** in price data  
+- Fits complex Airbnb factors like *location*, *reviews*, and *amenities*  
+- Parameters **C** and **γ (gamma)** tuned via cross-validation  
+- Provides **robust performance** and avoids overfitting  
+
+$$
+K(x_i, x_j) = \exp(-\gamma \| x_i - x_j \|^2)
+$$
+
+---
+class: incremental
+#5️⃣ Model(s) Used & Why
+## Softmax Logistic Regression
+
+
+- **Baseline model** for the multi-class price classification task  
+- Uses the **Softmax function** to estimate the probability of price classes 
+
+![](pre_files/figure-html/softmax formula.png)
+
+- A **linear** and **interpretable** model — coefficients show the direction and strength of each feature’s influence  
+- Works well since most features have roughly **linear relationships** with price  
+- Trained using **5-fold cross-validation** and **one-hot encoding** for stable and reliable performance  
+
 ---
 #6️⃣ Key Results & Visuals
 
