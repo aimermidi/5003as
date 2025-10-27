@@ -57,22 +57,21 @@ Using **Sydney Airbnb data** to classify listing prices into discrete categories
 
 # 3️⃣ Data Processing
 
+**Data Cleaning: What we did**
+
+* Robustly load the CSV and treat all columns as text to avoid auto-parsing.
+* Auto-detect the *price* column, clean it to numeric, remove invalid prices (≤0).
+* Detect outliers with Tukey IQR and reduce their influence by winsorizing (3%–97%).
+
+**Why:** reliable numeric target → stable bins & models; winsorize keeps N while limiting extreme influence.
+
+* Keep raw copy of price as `price_orig` to enable reversibility.
+* Winsorization chosen for robustness (preserve N, reduce variance from extremes).
+* bin `price` → `price_class`, encode categoricals, build models.
+
 **Data Source:**  
-- Source (e.g., Kaggle, ABS, API, CSV dataset)  
-- Data size / structure  
-
-**Steps:**  
-1. Data cleaning (missing values, duplicates)  
-2. Feature selection or transformation  
-3. Tools used (e.g., `dplyr`, `ggplot2`)
-
-```{r, echo=FALSE, message=FALSE}
-library(ggplot2)
-ggplot(mtcars, aes(wt, mpg)) +
-  geom_point() +
-  theme_minimal() +
-  labs(title="Example Data Plot", x="Weight", y="Miles per Gallon")
-```
+- Source: Sydney Airbnb 
+- Data size: 18187 observations of 79 variables  
 
 ---
 
@@ -187,24 +186,9 @@ What would you improve if you had more time?
 Link back to your research question
 Does your result answer the question clearly?
 
-
-
----
-**Data Cleaning:**
-
-* Robustly load the CSV and treat all columns as text to avoid auto-parsing.
-* Auto-detect the *price* column, clean it to numeric, remove invalid prices (≤0).
-* Detect outliers with Tukey IQR and reduce their influence by winsorizing (3%–97%).
-
-**Why:** reliable numeric target → stable bins & models; winsorize keeps N while limiting extreme influence.
-
-* Keep raw copy of price as `price_orig` to enable reversibility.
-* Winsorization chosen for robustness (preserve N, reduce variance from extremes).
-* bin `price` → `price_class`, encode categoricals, build models.
-
 ---
 
-**Code: robust read + auto-detect price + clean → numeric**
+**Appendix: Data Processing Code: robust read + auto-detect price + clean → numeric**
 
 ```r
 # Robust read: try UTF-8, fallback GB18030, keep all columns as character
