@@ -91,7 +91,7 @@ summary(mtcars)
 ```
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
+#5️⃣ Models Used & Why
 ## Softmax Logistic Regression
 
 
@@ -106,7 +106,7 @@ class: incremental
 
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
+#5️⃣ Models Used & Why
 ## LDA (Linear Discriminant Analysis)
 
 - Projects data to **maximize separation** between price classes  
@@ -118,7 +118,7 @@ class: incremental
 
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
+#5️⃣ Models Used & Why
 ## K-Nearest Neighbour (kNN)
 
 
@@ -130,7 +130,7 @@ class: incremental
 
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
+#5️⃣ Models Used & Why
 ## Support Vector Machine (SVM, RBF Kernel)
 
 
@@ -146,18 +146,15 @@ $$
 
 ---
 class: incremental
-#5️⃣ Model(s) Used & Why
-## Softmax Logistic Regression
+#5️⃣ Models Used & Why
+## Random Forest
 
 
-- **Baseline model** for the multi-class price classification task  
-- Uses the **Softmax function** to estimate the probability of price classes 
-
-![](pre_files/figure-html/softmax formula.png)
-
-- A **linear** and **interpretable** model — coefficients show the direction and strength of each feature’s influence  
-- Works well since most features have roughly **linear relationships** with price  
-- Trained using **5-fold cross-validation** and **one-hot encoding** for stable and reliable performance  
+- **Ensemble** of multiple decision trees  
+- Trained on **bootstrap samples** with random feature selection  
+- Captures **non-linear interactions** and reduces variance  
+- Works well for **mixed numeric & categorical** Airbnb features  
+- Tuned via **5-fold cross-validation**; analyzed **feature importance**  
 
 ---
 #6️⃣ Key Results & Visuals
