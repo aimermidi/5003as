@@ -32,22 +32,26 @@ library(stringr)
 # 1️⃣ Project Topic
 
 **Project Title:**  
-A brief, catchy title for your data project.
+Building a Multi-Class Classification Model for Intelligent Price Category Prediction
 
-**Overview:**  
-- What is your project about?  
-- Why did you choose this topic?
+**What is the project about?**  
+Using **Sydney Airbnb data** to classify listing prices into discrete categories
+
+**Why did we choose this topic?**  
+> Predicting precise price is inaccurate  
+> Predicting price range is more practical  
+> A classification approach fits this real-world problem
 
 ---
 
 # 2️⃣ Research Question & Why It Matters
 
 **Research Question:**  
-> e.g. “How do Airbnb room types and locations influence price?”
+> How can we accurately predict a property's **price category** (Low, Medium, or High) based on its core features?
 
-**Motivation:**  
-- Why is this question important to society / business / people?  
-- What inspired your group to study it?
+**Why it matters?**  
+- **For Travelers:** Quick budget filtering to find affordable accommodation  
+- **For Hosts:** Market insights to optimize pricing and maximize revenue
 
 ---
 
