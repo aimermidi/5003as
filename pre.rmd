@@ -62,13 +62,7 @@ A brief, catchy title for your data project.
 2. Feature selection or transformation  
 3. Tools used (e.g., `dplyr`, `ggplot2`)
 
-```{r, echo=FALSE, message=FALSE}
-library(ggplot2)
-ggplot(mtcars, aes(wt, mpg)) +
-  geom_point() +
-  theme_minimal() +
-  labs(title="Example Data Plot", x="Weight", y="Miles per Gallon")
-```
+
 
 ---
 
@@ -82,7 +76,7 @@ Key distributions
 
 Interesting patterns
 ```{r}
-summary(mtcars)
+
 
 ```
 ---
