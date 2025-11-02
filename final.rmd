@@ -2269,7 +2269,19 @@ Overall, Softmax Regression still delivers the most consistent and interpretable
 
 
 # Conclusion
+This study applied supervised learning methods to predict the price categories of Sydney Airbnb listings.
 
+Through systematic data cleaning, feature engineering, and exploratory analysis, key determinants of price segmentation were identified, including room type, neighborhood, and accommodates.
+
+Based on the same cleaned dataset, five models—Softmax Regression, Linear Discriminant Analysis (LDA), k-Nearest Neighbour (kNN), Support Vector Machine (RBF kernel), and Random Forest—were constructed.
+
+Since each algorithm has different input requirements, further preprocessing steps such as standardization, encoding, and train-test splitting were conducted independently. Nevertheless, all models were trained on the same cleaned dataset and evaluated using consistent metrics to ensure comparability.
+
+Softmax Regression achieved the best performance (Accuracy ≈ 0.92, Macro F1 ≈ 0.92), indicating that linear models can effectively capture the main structural relationships within the dataset and maintain strong generalization. Random Forest (Accuracy ≈ 0.80, F1 ≈ 0.81) followed closely, demonstrating strong capability in modelling nonlinear interactions. kNN and SVM (RBF) achieved around 0.70 accuracy with stable performance, while LDA, as a linear baseline, offered interpretability but was limited by its linear assumptions and feature constraints. Overall, the results highlight that geographical location, accommodation capacity, and room type are the dominant factors influencing Airbnb price categories.
+
+The findings not only reveal the key drivers of Sydney Airbnb pricing but also highlight the practical value of applying machine learning models in short-term rental market analysis. By analyzing both physical and vocational attributes in a quantitative manner, this study offers practical, data-driven insights for market participants. For travelers, the predicted price categories help identify accommodation options within different budget ranges; for hosts, analyzing the characteristics of high-priced listings—such as advantageous locations, entire-home offerings, and greater capacity—can guide optimization of property configurations and pricing strategies, thereby improving competitiveness.
+
+Future work may integrate textual and temporal information, such as listing descriptions, review sentiments, and seasonal trends, to capture dynamic market patterns and further enhance model interpretability.
 
 # Reference
 
