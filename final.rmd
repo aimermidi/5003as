@@ -968,7 +968,7 @@ df_after <- df_lda %>%
 
 ```
 ### LDA Process
-```{r, message=FALSE, warning=FALSE, results='hide'}
+```{r, message=FALSE, warning=FALSE, results='hide',out.width="60%", fig.align='center'}
 library(MASS)
 library(conflicted)
 conflict_prefer("select", "dplyr")
