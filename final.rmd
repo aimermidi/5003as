@@ -2267,6 +2267,35 @@ Random Forest shows strong improvement compared to earlier runs, achieving Accur
 
 Overall, Softmax Regression still delivers the most consistent and interpretable results, while Random Forest demonstrates powerful generalization with nonlinear interactions. kNN and SVM (RBF) achieve competitive middle-ground performance, and LDA offers a simple yet informative linear baseline.
 
+# Insight
+Building upon the metric comparison, a deeper dive into the models' behavior reveals critical insights into the nature of the property price classification problem.
+
+## Fuzzy Price Thresholds and Adjacent Misclassification
+A consistent and critical pattern emerges across all classification models: most prediction errors occur at the boundaries between adjacent price categories. 
+
+For example, both the Random Forest and LDA confusion matrices explicitly show that misclassifications primarily happen between the [0, 150) and [150, 300) ranges, and between the [150, 300) and [300, +) ranges. 
+
+The kNN model notes this overlap is "understandable" because listings near a price boundary often share "similar characteristics in terms of room type and number of amenities".
+
+This suggests that the defined price-range thresholds are inherently fuzzy in the real world, meaning the models are struggling not due to a lack of predictive power, but because the underlying data makes the boundary ambiguous. The error is often near-miss rather than a complete failure in prediction.
+
+## The Power of Simplicity
+Softmax's Unexpected DominanceThe Softmax Logistic Regression model's best-in-class performance (Accuracy $\approx 0.9185$) is the most significant and unique finding.
+
+This suggests that the relationship between the 50 engineered features and the price-range outcome is predominantly linear and additive. Despite the availability of complex, non-linear models like Random Forest and SVM, a simpler, highly interpretable linear approach effectively captures the primary structure of the pricing tiers.
+
+This is a crucial insight for practical application: a high-performing model that also allows for direct interpretation of feature coefficients is often preferred in real-world statistical applications, offering both predictive power and clear understanding of the drivers.
+
+## Data Structure vs. Model Complexity
+The performance spread across models offers a reflection on the data's inherent structure:
+
+Non-linear models (kNN and SVM) achieved moderate performance ($\approx 0.70$ Accuracy), suggesting that local, non-linear dependencies and neighborhood relationships provide some benefit, but not enough to drastically outperform the linear baseline.
+
+Random Forest ($\approx 0.80$ Accuracy) bridged the gap, indicating that while non-linear feature interactions are present and valuable, the primary predictive signal is best harnessed by the Softmax's global linear structure.
+
+The key takeaway here is that the Sydney property pricing problem, as defined by the 50 features, is primarily structured by strong, globally-consistent linear relationships.
+
+
 
 # Conclusion
 This study applied supervised learning methods to predict the price categories of Sydney Airbnb listings.
