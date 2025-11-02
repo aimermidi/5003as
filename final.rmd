@@ -106,7 +106,7 @@ These observations highlight both the richness and the challenges of the dataset
 # Data Cleaning & Feature Engineering
 ## Price Column Processing & Outlier Detection
 We first preprocess the target column price by removing all non-numeric characters, converting price to numeric type, and removing observations with price ≤ 0. We also use IQR for outlier analysis.
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 library(tidyverse)
 library(corrplot)
 # Read in the original data (all ilibrary(corrplot)n character format to avoid misinterpretation of "price")
@@ -159,7 +159,7 @@ tibble(
 ```
 **Step 2: Price Standardization**
 We normalize the price column by lowercasing it, removing commas and non-numeric characters, coercing it to numbers, and filtering out missing entries and prices ≤ 0.
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Step 2: Clean and convert the price column (corrected)
 
 df <- df %>%
@@ -176,7 +176,7 @@ df <- df %>%
 ```
 **Step 3: IQR-Based Outlier Analysis for Price**
 We conduct outlier detection on the cleaned price data using the Tukey IQR rule: we compute Q1, Q3, and IQR = Q3 - Q1, and define the inlier range as [Q1-1.5\*IQR, Q3+1.5\*IQR] (Lin, Zhang, & Tong, 2025). We then summarize key diagnostics in the table IQR-based Outlier Analysis Summary.(Dash, Behera, Dehuri, & Ghosh, 2023; Mekelburg & Strauss, 2024).
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Step 3: Analyze outliers using IQR (will now work correctly)
 q1 <- quantile(df[[price_col]], 0.25)
 q3 <- quantile(df[[price_col]], 0.75)
@@ -248,7 +248,7 @@ knitr::kable(summary_tbl, caption = "Winsorization Summary (3%–97% percentiles
 **Step 4: Save cleaned data**
 After completing the above cleaning steps, if necessary, the cleaned data can be saved into a new file named "cleaned_data.csv" by following code.
 
-```{r}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Step 4: Save the further cleaned data
 write_csv(df, "cleaned_data.csv")
 ```
@@ -418,7 +418,7 @@ Removed records with column misalignment detected during manual inspection to pr
     * `host_id` * `host_url` * `host_name` * `host_about` * `host_thumbnail_url` * `host_picture_url`
     * `neighbourhood_group_cleansed` * `calendar_updated`
 These features were removed either because they had little analytical value or because their missing data rate was close to 100%.
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 library(dplyr)
 library(stringr)
 library(readr)
@@ -981,7 +981,7 @@ ggplot(ld_df, aes(x = LD1, y = LD2, color = price_class)) +
 
 ```
 
-```{r}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 library(yardstick)
 library(conflicted)
 
