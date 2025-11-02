@@ -1943,7 +1943,14 @@ softmax_rec <- mean(sapply(levels(all_true), function(l) {
   fn <- sum(all_pred != l & all_true == l)
   if (tp + fn == 0) 0 else tp / (tp + fn)
 }))
+softmax_acc  <- mean(cv_results$accuracy, na.rm = TRUE)
+softmax_prec <- mean(softmax_prec, na.rm = TRUE)
+softmax_rec  <- mean(softmax_rec, na.rm = TRUE)
+softmax_f1   <- mean(cv_results$macro_f1, na.rm = TRUE)
 
+svm_prec <- mean(svm_prec, na.rm = TRUE)
+svm_rec  <- mean(svm_rec,  na.rm = TRUE)
+svm_f1   <- mean(svm_f1,   na.rm = TRUE)
 # --- Compute missing LDA precision / recall / F1 / MCC ---
 lda_prec <- mean(sapply(levels(df_after$price_class), function(l) {
   tp <- sum(lda_pred$class == l & df_after$price_class == l)
