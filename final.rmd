@@ -991,6 +991,54 @@ ggplot(ld_df, aes(x = LD1, y = LD2, color = price_class)) +
 
 
 ```
+
+```{r}
+library(yardstick)
+library(conflicted)
+
+
+# helper functions for multi-class MCC
+mcc_binary <- function(t, p) {
+  tp <- sum(p == 1 & t == 1)
+  tn <- sum(p == 0 & t == 0)
+  fp <- sum(p == 1 & t == 0)
+  fn <- sum(p == 0 & t == 1)
+  denom <- sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+  if (is.na(denom) || denom == 0) return(0)
+  (tp * tn - fp * fn) / denom
+}
+
+mcc_macro <- function(truth, pred) {
+  lv <- levels(truth)
+  mccs <- sapply(lv, function(l) {
+    t <- ifelse(truth == l, 1, 0)
+    p <- ifelse(pred == l, 1, 0)
+    mcc_binary(t, p)
+  })
+  mean(mccs, na.rm = TRUE)
+}
+
+# Compute LDA performance metrics
+lda_results <- data.frame(
+  truth = df_after$price_class,
+  estimate = lda_pred$class
+)
+
+lda_acc <- mean(lda_results$truth == lda_results$estimate)
+lda_prec <- yardstick::precision(lda_results, truth = truth, estimate = estimate, estimator = "macro")$.estimate
+lda_rec  <- yardstick::recall(lda_results, truth = truth, estimate = estimate, estimator = "macro")$.estimate
+lda_f1   <- yardstick::f_meas(lda_results, truth = truth, estimate = estimate, estimator = "macro")$.estimate
+lda_mcc  <- mcc_macro(lda_results$truth, lda_results$estimate)
+
+# Print summary
+cat("\nLDA MODEL PERFORMANCE SUMMARY:\n")
+cat(sprintf("  Accuracy:  %.4f\n", lda_acc))
+cat(sprintf("  Precision (Macro): %.4f\n", lda_prec))
+cat(sprintf("  Recall (Macro):    %.4f\n", lda_rec))
+cat(sprintf("  F1 Score (Macro):  %.4f\n", lda_f1))
+cat(sprintf("  MCC:               %.4f\n", lda_mcc))
+```
+
 Then we got the result of LDA with a visualized plot, which shows the relation between LD1 and LD2, regarding to the 'price_class'. The detailed evaluation of LDA will be discussed later in the chapter of 'Performance Evaluation'. Next, let's dive into the implementation of KNN.
 
 ## K Nearest Neighbour (kNN)
@@ -1132,14 +1180,14 @@ set.seed(123)
 # --- 1. split dataset ---
 df_filtered$price_class <- factor(df_filtered$price_class)
 index <- createDataPartition(df_filtered$price_class, p = 0.75, list = FALSE)
-train <- df_filtered[index, ]
-test  <- df_filtered[-index, ]
+svm_train <- df_filtered[index, ]
+svm_test  <- df_filtered[-index, ]
 
 # --- 2. remain dependent variables and independent variables ---
 vars <- c("accommodates", "bedrooms", "beds", "room_type", "neighbourhood_cleansed", "price_class")
-train <- train[, vars]
-test  <- test[, vars]
-head(train)
+svm_train <- svm_train[, vars]
+svm_test  <- svm_test[, vars]
+head(svm_train)
 
 
 
@@ -1151,15 +1199,15 @@ The final model was then trained on the full training set with the best (C, γ) 
 ```{r, message=FALSE, warning=FALSE, results='hide'}
 
 # --- 3. make sure no missing value ---
-train <- na.omit(train)
-test  <- na.omit(test)
+svm_train <- na.omit(svm_train)
+svm_test  <- na.omit(svm_test)
 
 # --- 4. room_type and neighbourhood_cleansed  ---
-train$room_type <- as.factor(train$room_type)
-test$room_type  <- factor(test$room_type, levels = levels(train$room_type))
+svm_train$room_type <- as.factor(svm_train$room_type)
+svm_test$room_type  <- factor(svm_test$room_type, levels = levels(svm_train$room_type))
 
-train$neighbourhood_cleansed <- as.factor(train$neighbourhood_cleansed)
-test$neighbourhood_cleansed  <- factor(test$neighbourhood_cleansed, levels = levels(train$neighbourhood_cleansed))
+svm_train$neighbourhood_cleansed <- as.factor(svm_train$neighbourhood_cleansed)
+svm_test$neighbourhood_cleansed  <- factor(svm_test$neighbourhood_cleansed, levels = levels(svm_train$neighbourhood_cleansed))
 
 
 ```
@@ -1169,7 +1217,7 @@ test$neighbourhood_cleansed  <- factor(test$neighbourhood_cleansed, levels = lev
 tuned <- tune(
   svm,
   price_class ~ .,
-  data = train,
+  data = svm_train,
   kernel = "radial",
   ranges = list(cost = c(0.1, 1, 10), gamma = c(0.01, 0.1, 1)),
   tunecontrol = tune.control(cross = 3)
@@ -1183,7 +1231,7 @@ tuned <- tune(
 # --- 6. output optimal parameters ---
 best_model <- svm(
   price_class ~ .,
-  data = train,
+  data = svm_train,
   kernel = "radial",
   cost = 1,
   gamma = 1
@@ -1191,7 +1239,7 @@ best_model <- svm(
 
 
 # --- 7. predict ---
-svm_pred<- predict(best_model, newdata = test)
+svm_pred<- predict(best_model, newdata = svm_test)
 ```
 
 
@@ -1409,7 +1457,8 @@ top_imp <- tibble(Feature = names(imp)[1:min(20, length(imp))],
 cat("\n🏆 Top 20 Feature Importances:\n")
 print(top_imp)
 
-
+rf_cls <- factor(unlist(rf_fold_preds), levels = levels(df_clean$price_class))
+rf_test_df <- data.frame(price_class = unlist(rf_fold_truth))
 
 ```
 
@@ -1747,18 +1796,18 @@ conflicts_prefer(yardstick::precision)
 
 # yardstick 
 res <- tibble(
-  truth = test$price_class,
-  .pred_class = factor(svm_pred, levels = levels(test$price_class))
+  truth = svm_test$price_class,
+  .pred_class = factor(svm_pred, levels = levels(svm_test$price_class))
 )
 
-acc   <- accuracy(res, truth, .pred_class)
-prec  <- precision(res, truth, .pred_class, estimator = "macro")
-rec   <- yardstick::recall(res, truth, .pred_class, estimator = "macro")
-f1    <- f_meas(res, truth, .pred_class, estimator = "macro")
+svm_acc   <- accuracy(res, truth, .pred_class)
+svm_prec  <- precision(res, truth, .pred_class, estimator = "macro")
+svm_rec   <- yardstick::recall(res, truth, .pred_class, estimator = "macro")
+svm_f1    <- f_meas(res, truth, .pred_class, estimator = "macro")
 
 metrics_table <- tibble(
   Metric = c("Accuracy", "Precision (Macro)", "Recall (Macro)", "F1-Score (Macro)"),
-  Value  = c(acc$.estimate, prec$.estimate, rec$.estimate, f1$.estimate)
+  Value  = c(svm_acc$.estimate, svm_prec$.estimate, svm_rec$.estimate, svm_f1$.estimate)
 )
 
 metrics_table
@@ -1772,7 +1821,7 @@ metrics_table
 library(caret)
 library(ggplot2)
 
-cm <- confusionMatrix(svm_pred, test$price_class)
+cm <- confusionMatrix(svm_pred, svm_test$price_class)
 
 cm$table
 
@@ -1833,6 +1882,44 @@ ggplot(top_imp_plot, aes(x = reorder(Feature, Importance), y = Importance)) +
 
 ```
 
+```{r rf_performance_table, message=FALSE, warning=FALSE}
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(yardstick)
+
+suppressMessages({
+  conflicted::conflicts_prefer(yardstick::precision)
+  conflicted::conflicts_prefer(yardstick::recall)
+  conflicted::conflicts_prefer(yardstick::f_meas)
+})
+
+# Calculate key metrics (macro-averaged)
+rf_results <- tibble(
+  truth = rf_test_df$price_class,
+  estimate = rf_cls 
+)
+
+rf_acc  <- confusionMatrix(rf_cls , rf_test_df$price_class)$overall["Accuracy"]
+rf_prec <- precision(rf_results, truth, estimate, estimator = "macro")
+rf_rec  <- recall(rf_results, truth, estimate, estimator = "macro")
+rf_f1   <- f_meas(rf_results, truth, estimate, estimator = "macro")
+rf_mcc  <- mcc(rf_results, truth, estimate)
+
+# Combine into a summary table
+rf_table <- data.frame(
+  Metric = c("Accuracy", "Precision (Macro)", "Recall (Macro)", "F1-Score (Macro)", "MCC"),
+  Value  = c(rf_acc, rf_prec$.estimate, rf_rec$.estimate, rf_f1$.estimate, rf_mcc$.estimate)
+)
+
+# Display as formatted table
+kable(rf_table, digits = 4, caption = "Random Forest Model Performance Summary") %>%
+  kable_styling(full_width = FALSE, position = "center",
+                bootstrap_options = c("striped", "hover", "condensed"))
+
+```
+
+
 
 Across folds, accuracy and macro-F1 are closely aligned, suggesting balanced performance across classes rather than dominance by the majority [150,300) band. Macro-MCC confirms consistent correlation between predictions and ground truth under class imbalance. The aggregated confusion matrix shows most errors occur at the boundaries between [0,150) and [150,300), and between [150,300) and [300,+), consistent with fuzzy price thresholds. Feature-importance results corroborate earlier EDA: capacity and neighbourhood signals jointly structure the price tiers.
 
@@ -1841,61 +1928,161 @@ Across folds, accuracy and macro-F1 are closely aligned, suggesting balanced per
 
 ## Comparison of Models
 
-1. **Softmax Logistic Regression**
+```{r fill_missing_metrics, message=FALSE, warning=FALSE}
 
-We adopt multinomial logistic regression as the baseline due to its strong interpretability and robustness in multi-class settings. Model coefficients directly indicate the direction and relative magnitude of each feature’s effect on the odds of belonging to different price bands. With appropriate regularization, it typically delivers a stable and reliable baseline on small to moderate sample sizes.
+## ====== Fill missing values in comparison_df ======
 
-This model fits our dataset well: the features include both numeric variables and categorical variables represented via one-hot encoding. After standardization and L1/L2 regularization, the model mitigates instability from multicollinearity and noisy features. Although its decision boundary is linear, modest feature engineering—such as adding interaction terms or using piecewise transforms—can increase flexibility. Even without extensive engineering, multinomial logistic regression provides a clear and reproducible baseline against which the gains of more complex models can be assessed.
+# --- Compute missing Softmax precision / recall ---
+softmax_prec <- mean(sapply(levels(all_true), function(l) {
+  tp <- sum(all_pred == l & all_true == l)
+  fp <- sum(all_pred == l & all_true != l)
+  if (tp + fp == 0) 0 else tp / (tp + fp)
+}))
+softmax_rec <- mean(sapply(levels(all_true), function(l) {
+  tp <- sum(all_pred == l & all_true == l)
+  fn <- sum(all_pred != l & all_true == l)
+  if (tp + fn == 0) 0 else tp / (tp + fn)
+}))
 
-2. **Linear Discriminant Analysis (LDA)**
+# --- Compute missing LDA precision / recall / F1 / MCC ---
+lda_prec <- mean(sapply(levels(df_after$price_class), function(l) {
+  tp <- sum(lda_pred$class == l & df_after$price_class == l)
+  fp <- sum(lda_pred$class == l & df_after$price_class != l)
+  if (tp + fp == 0) 0 else tp / (tp + fp)
+}))
+lda_rec <- mean(sapply(levels(df_after$price_class), function(l) {
+  tp <- sum(lda_pred$class == l & df_after$price_class == l)
+  fn <- sum(lda_pred$class != l & df_after$price_class == l)
+  if (tp + fn == 0) 0 else tp / (tp + fn)
+}))
+lda_f1 <- mean(sapply(levels(df_after$price_class), function(l) {
+  tp <- sum(lda_pred$class == l & df_after$price_class == l)
+  fp <- sum(lda_pred$class == l & df_after$price_class != l)
+  fn <- sum(lda_pred$class != l & df_after$price_class == l)
+  p <- ifelse(tp + fp == 0, 0, tp / (tp + fp))
+  r <- ifelse(tp + fn == 0, 0, tp / (tp + fn))
+  if ((p + r) == 0) 0 else 2 * p * r / (p + r)
+}))
+lda_mcc <- mcc_macro(df_after$price_class, lda_pred$class)
 
-Linear Discriminant Analysis (LDA) achieves class separation by projecting data into a low-dimensional subspace that maximizes between-class variance and minimizes within-class variance. When class covariance structures are similar and variables, after appropriate transformations, are approximately Gaussian, LDA can deliver performance comparable to more complex models with very low model complexity. Its discriminant axes also clarify which composite directions primarily separate price bands, aiding interpretability.
-Regarding applicability, LDA is sensitive to the scale of numeric features, making standardization a prerequisite. Highly correlated or redundant variables should be addressed via dimension reduction or feature selection to stabilize covariance estimation. With moderate sample sizes and not severely imbalanced classes, parameter estimates are typically stable; if the equal-covariance assumption is weak, a shrinkage version of LDA can yield more robust discriminant directions, balancing interpretability and performance.
+# --- Compute missing KNN precision / recall ---
+knn_prec <- mean(sapply(levels(test_filtered$price_class), function(l) {
+  tp <- sum(knn_test_pred == l & test_filtered$price_class == l)
+  fp <- sum(knn_test_pred == l & test_filtered$price_class != l)
+  if (tp + fp == 0) 0 else tp / (tp + fp)
+}))
+knn_rec <- mean(sapply(levels(test_filtered$price_class), function(l) {
+  tp <- sum(knn_test_pred == l & test_filtered$price_class == l)
+  fn <- sum(knn_test_pred != l & test_filtered$price_class == l)
+  if (tp + fn == 0) 0 else tp / (tp + fn)
+}))
 
-3. **K Nearest Neighbour (kNN)**
 
-The k-nearest neighbors (kNN) method does not rely on an explicit functional form and naturally captures complex local structure and nonlinear decision boundaries. When class assignment is jointly shaped by multi-dimensional neighborhood characteristics, kNN often provides a clear and informative reference.
+knn_f1 <- mean(sapply(levels(test_filtered$price_class), function(l) {
+  tp <- sum(knn_test_pred == l & test_filtered$price_class == l)
+  fp <- sum(knn_test_pred == l & test_filtered$price_class != l)
+  fn <- sum(knn_test_pred != l & test_filtered$price_class == l)
+  
+  prec <- ifelse(tp + fp == 0, 0, tp / (tp + fp))
+  rec  <- ifelse(tp + fn == 0, 0, tp / (tp + fn))
+  
+  if ((prec + rec) == 0) 0 else 2 * prec * rec / (prec + rec)
+}))
 
-For our task, the effectiveness of kNN hinges on the metric and scale of the feature space. Numeric variables should be standardized, and categorical variables can be made compatible with Euclidean distance through one-hot encoding. The number of neighbors (k) requires tuning, and distance weighting can be used to reduce the influence of noisy samples. Because kNN is sensitive to high-dimensional sparsity and irrelevant features, we will combine it with feature selection or dimensionality reduction to mitigate the curse of dimensionality and ensure fair, stable comparisons as a local model.
 
-4. **Support Vector Machine (SVM, RBF kernel)**
+```
 
-Kernel SVM is selected for its consistent performance on complex nonlinear boundaries and its strong generalization. Grounded in the maximum-margin principle, SVM seeks the widest separating boundary in a high-dimensional implicit feature space. With appropriate regularization (C) and kernel width (γ), the RBF kernel models curved decision boundaries induced by intertwined factors such as location, amenities, and ratings—without explicitly engineering numerous interactions or higher-order terms. The kernel trick externalizes representational complexity to the kernel itself, enabling the model to capture key structures while remaining comparatively compact.
 
-For our multi-class setting, we use a one-vs-rest scheme, standardize all numeric features, and apply one-hot encoding to categorical variables for SVM compatibility. Because performance is sensitive to the joint tuning of C and γ, we rely on stratified cross-validation with grid or Bayesian search to mitigate overfitting, and we incorporate class weights when class imbalance is present. Notably, the SVM decision function depends on a limited set of support vectors, which often yields competitive margins and robust generalization in medium-dimensional feature spaces with moderate sample sizes. Compared with a linear baseline, kernel SVM provides meaningful nonlinear gains without the data scale and hyperparameter complexity typically required by deep models. When calibrated probabilities are needed for thresholding, we will apply temperature scaling or Platt scaling to improve the reliability of probability estimates.
+```{r}
+lda_acc  <- as.numeric(lda_acc)
 
-5. **Random Forest**
+rf_acc   <- as.numeric(rf_acc)
 
-Random forests model nonlinear relationships and feature interactions with minimal distributional assumptions, and they are relatively robust to outliers and monotonic transformations. By combining bagging with feature subsampling, they reduce variance while maintaining the capacity to fit complex decision boundaries. In settings with heterogeneous variables—such as location, amenities, reviews, and availability—random forests typically deliver strong initial performance with limited preprocessing and provide feature importance measures that aid interpretation.
+rf_prec <- as.numeric(precision(rf_results, truth, estimate, estimator = "macro")$.estimate[1])
+rf_rec  <- as.numeric(recall(rf_results, truth, estimate, estimator = "macro")$.estimate[1])
+rf_f1   <- as.numeric(f_meas(rf_results, truth, estimate, estimator = "macro")$.estimate[1])
 
-For our dataset, random forests naturally handle most numeric variables, and categorical variables only require one-hot encoding. The model can capture salient nonlinear interactions—such as location × amenities—that are critical for distinguishing price bands. To prevent overfitting and control computation, we will tune the number of trees, maximum depth, minimum samples per leaf, and the number of features considered at each split. When class distributions are imbalanced, we will apply balanced sampling or class weights to stabilize training and evaluation.
-——
-Overall, the five models span a broad methodological spectrum—from linear to nonlinear, discriminative to generative, and parametric to non-parametric. Using a consistent cross-validation design and a unified data-processing pipeline, we can quantify their relative gains on the price-band classification task and decide whether to introduce higher-complexity ensemble approaches or pursue more fine-grained feature engineering to further improve performance and robustness.
+svm_prec <- as.numeric(svm_prec)
+svm_rec  <- as.numeric(svm_rec)
+svm_f1   <- as.numeric(svm_f1)
+svm_acc <- as.numeric(confusionMatrix(svm_pred, svm_test$price_class)$overall["Accuracy"][1])
 
-## Evaluation Method
-1. **Hierarchical nested cross-validation**
+# ==== Build comparison_df safely ====
+comparison_df <- base::data.frame(
+  Model = c("Softmax Regression", "LDA", "kNN", "SVM (RBF)", "Random Forest"),
+  Accuracy = c(
+    mean(cv_results$accuracy),
+    lda_acc,
+    knn_acc,
+    svm_acc,   
+    rf_acc
+  ),
+  Precision = c(
+    softmax_prec,
+    lda_prec,
+    knn_prec,
+    svm_prec,   
+    rf_prec
+  ),
+  Recall = c(
+    softmax_rec,
+    lda_rec,
+    knn_rec,
+    svm_rec,    
+    rf_rec
+  ),
+  F1_Score = c(
+    mean(cv_results$macro_f1),
+    lda_f1,
+    knn_f1,
+    svm_f1,     
+    rf_f1
+  ),
+  stringsAsFactors = FALSE
+)
 
-We use stratified k-fold cross-validation as the outer evaluation and perform an additional inner cross-validation within each outer training fold for hyperparameter tuning. All preprocessing steps (imputation, standardization, one-hot encoding, and feature selection) are encapsulated in a single pipeline and fitted within folds to prevent information leakage and selection bias (Cawley & Talbot, 2010; Varma & Simon, 2006). Stratification maintains the price_class distribution across folds; when observations are correlated by host or geography, group- or block-wise cross-validation is adopted to assess transferability (Nadeau & Bengio, 2003).
+# === Format numeric columns ===
+comparison_df[, 2:5] <- round(comparison_df[, 2:5], 4)
 
-The rationale for nested CV is to decouple model selection from performance estimation, thereby avoiding the optimistic bias that arises when both are conducted within the same CV loop. This is especially important when comparing multiple models—particularly those sensitive to hyperparameters such as SVMs and random forests—so as to obtain generalization error estimates closer to those from an independent test set (Cawley & Talbot, 2010; Varma & Simon, 2006).
+# === Pretty print as table ===
+kable(
+  comparison_df,
+  caption = "Performance Comparison Across Models",
+  align = "c"
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
+  column_spec(1, bold = TRUE) %>%
+  add_header_above(c(" " = 1, "Performance Metrics" = 4))
 
-2. **Macro-F1) and MCC**
+```
 
-Macro-F1 evaluates overall classification quality by scoring each class separately and then averaging, thus preventing majority classes from dominating the metric and masking minority-class performance. The Matthews correlation coefficient (MCC) combines TP/TN/FP/FN into a single correlation measure and is more robust under class imbalance and asymmetric error distributions, avoiding the pitfalls of relying solely on accuracy or a single F1 score (Chicco & Jurman, 2020; Powers, 2011). We report the mean macro-F1 and MCC with 95% confidence intervals on the outer folds as the primary basis for model ranking and significance testing.
 
-We designate MCC as a co-primary metric because recent systematic comparisons show that MCC yields a more reliable global association measure across a range of imbalance and noise settings (Chicco & Jurman, 2020), while macro-F1 ensures equal consideration of all price bands; the two metrics are complementary (Powers, 2011).
 
-3. **ROC-AUC and Log Loss / Brier**
 
-For discriminative ability, we report the macro-averaged ROC-AUC (e.g., One-vs-Rest followed by averaging across classes) using the Hand and Till generalization to ensure comparability and threshold invariance in the multi-class setting (Hand & Till, 2001). For probability quality, we use Log Loss or the Brier score to assess the credibility of predicted probabilities, rather than relying solely on ranking performance (Brier, 1950; Powers, 2011).
 
-When probability estimates are under- or over-confident, we apply temperature scaling or Platt scaling on a validation set and re-examine Log Loss/Brier and calibration curves, thereby improving the usability and reliability of price-band probabilities for downstream decisions (Guo et al., 2017).
 
-4. **Confusion Matrix + Calibration/Threshold Diagnostics**
 
-Aggregated confusion matrices on the outer test folds identify which adjacent price bands are most frequently confused and, together with class-wise precision and recall, clarify “where errors occur and to whom they are assigned.” This separates separability (“can classes be distinguished?”) from calibration and thresholding (“are predictions accurate and reported reliably?”) (Powers, 2011). We then plot threshold–metric curves (F1/precision/recall as a function of the decision threshold) and calibration curves with expected calibration error (ECE) to provide quantitative evidence for threshold selection and downstream policy design (Guo et al., 2017; Powers, 2011).
+Across all five classification algorithms — Softmax Regression, Linear Discriminant Analysis (LDA), k-Nearest Neighbors (kNN), Support Vector Machine (SVM with RBF kernel), and Random Forest — distinct trade-offs emerge between predictive accuracy, generalization ability, and interpretability.
 
-In our setting, price bands are shaped by interactions among location, amenities, and ratings, making adjacent bands particularly prone to confusion. These diagnostics help determine whether errors stem from data quality issues (misalignment, outliers, high missingness) or from insufficient feature representation (need for engineered or binned features), thereby guiding the next iteration of feature engineering and data remediation (Powers, 2011).
+Softmax Regression achieves the highest overall performance, with Accuracy = 0.918 and F1 = 0.919. Its balanced Precision (0.920) and Recall (0.919) indicate stable classification across all price tiers. This suggests that the linear decision boundaries it learns are sufficient to capture the primary structure in the data, making it both effective and interpretable.
+
+LDA performs moderately, with Accuracy = 0.598 and F1 = 0.595, consistent with its simplifying Gaussian and equal-covariance assumptions. Its Precision (0.625) and Recall (0.582) remain relatively balanced, suggesting that it still identifies meaningful linear separations despite reduced flexibility compared to nonlinear models.
+
+kNN yields Accuracy = 0.708 and F1 = 0.709, striking a reasonable balance between local adaptivity and noise sensitivity. Its Precision (0.728) and Recall (0.700) indicate that it captures neighborhood-based structure effectively, though performance can vary with data density.
+
+SVM (RBF) performs comparably with Accuracy = 0.701 and F1 = 0.704. The Precision (0.720) and Recall (0.694) values imply solid boundary discrimination and moderate generalization. This model benefits from nonlinear flexibility but may require tuning of kernel parameters for further gains.
+
+Random Forest shows strong improvement compared to earlier runs, achieving Accuracy = 0.802 and F1 = 0.805. Its Precision (0.820) and Recall (0.797) reflect robust ensemble learning and better handling of nonlinearity and mixed data types. This suggests it generalizes well while remaining resilient to outliers.
+
+Overall, Softmax Regression still delivers the most consistent and interpretable results, while Random Forest demonstrates powerful generalization with nonlinear interactions. kNN and SVM (RBF) achieve competitive middle-ground performance, and LDA offers a simple yet informative linear baseline.
+
+
+# Conclusion
+
 
 # Reference
 

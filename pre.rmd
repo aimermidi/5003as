@@ -82,7 +82,8 @@ Using **Sydney Airbnb data** to classify listing prices into discrete categories
 - 15,734 cleaned listings, 71 features  
 - Target = `price_class`  
 - Medium price range is the largest group  
-- Price goes up with room type, location, and capacity
+- Price goes up with room type, location, and capacity  
+
 #### Exploratory Analysis:  
 1. Price Class Distribution
 ```{r fig.align='center', fig.width=7, fig.height=3, echo=FALSE, message=FALSE, warning=FALSE}
@@ -100,40 +101,47 @@ ggplot(df, aes(x = price_class)) +
 ```
 
 ---
-###Exploratory Analysis:  
+#### Exploratory Analysis:  
 <div style="display:flex; justify-content:space-between; gap:20px;">
-  <!-- 左上：Price Class Distribution -->
-  <div style="width:48%;">
+  <div style="width:50%;">
+2.Room Type vs Price Class
   <h4 style="text-align:left; margin-top:0;">
-2. Room Type vs Price Class
-```{r fig.align='left', fig.width=7, fig.height=4, echo=FALSE, message=FALSE, warning=FALSE}
+```{r fig.align='left', fig.width=7.5, fig.height=4.5, echo=FALSE, message=FALSE, warning=FALSE}
   ggplot(df, aes(x = room_type, fill = price_class)) +
     geom_bar(position = "dodge") +
-    theme_minimal() +
-    labs(title = "Room Type vs Price Class")
+    theme_minimal(base_size = 15) +
+    theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 12)
+  )
 ```
   </div>
-  
-  <!-- 右上：Room Type vs Price Class -->
-<div style="width:48%;">
+<div style="width:50%;">
+3.Top 10 Neighborhoods vs Price Class
 <h4 style="text-align:right; margin-top:0;">
-3.Top 10 Neighbourhoods vs Price Class
-```{r fig.align='right', fig.width=7, fig.height=4, echo=FALSE, message=FALSE, warning=FALSE}
+```{r fig.align='right', fig.width=7.5, fig.height=4.5, echo=FALSE, message=FALSE, warning=FALSE}
 # Step 1: Calculate the frequency and select the top ten
 top_10 <- names(sort(table(df$neighbourhood_cleansed), decreasing = TRUE))[1:10]
-
 # Step 2: Filtering data
 df_subset <- df[df$neighbourhood_cleansed %in% top_10, ]
-
 # Step 3: Visualize
 ggplot(df_subset, aes(x = neighbourhood_cleansed, fill = price_class)) +
   geom_bar(position = "dodge") +
-  labs(title = "Top 10 Neighbourhoods vs Price Class",
+  labs(
        x = "Neighbourhood",
        y = "Count") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
+  theme_minimal(base_size = 15) +
+    theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text.x = element_text(size = 11, angle = 40, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 12)
+  )
 ```
 </div>
 </div> 
@@ -143,37 +151,45 @@ Insights:
 • Private rooms cluster in low price range.  
 • High-end suburbs (Manly, Waverley) show more high-price listings.  
 ---
+#### Exploratory Analysis:  
 <div style="display:flex; justify-content:space-between; gap:20px;">
-  <!-- 左上：Price Class Distribution -->
-  <div style="width:48%;">
-  <h4 style="text-align:left; margin-top:0;">
-4. Accommodates vs Price Class
-```{r fig.align='left', fig.width=7, fig.height=4, echo=FALSE, message=FALSE, warning=FALSE}
+<div style="width:40%;">
+4.Accommodates vs Price Class
+<h4 style="text-align:left; margin-top:0;">
+
+```{r fig.align='left', fig.width=10, fig.height=5, echo=FALSE, message=FALSE, warning=FALSE}
 # 1. Histogram: Distribution of Accommodates
 p1 <- ggplot(df, aes(x = accommodates)) +
   geom_histogram(binwidth = 1,fill = "skyblue", color = "black") +
   labs(title = "Distribution of Accommodates",
        x = "Number of Accommodates",
-       y = "Count")
-
+       y = "Count") +  
+  theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )
 # 2. Box plot: Accommodates vs Price Class
 p2 <- ggplot(df, aes(x = price_class, y = accommodates, fill = price_class)) +
   geom_boxplot() +
   labs(title = "Accommodates vs Price Class",
        x = "Price Class",
        y = "Accommodates") +
-  theme(legend.position = "none")
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "none"
+  )
 
 p1 + p2  
 ```
   </div>
-  
-  <!-- 右上：Room Type vs Price Class -->
-<div style="width:48%;">
+<div style="width:58%;">
+5.Correlation Heatmap of Top 12 Numerical Features
 <h4 style="text-align:right; margin-top:0;">
-5.Top 10 Neighbourhoods vs Price Class
-```{r fig.align='right', fig.width=9, fig.height=6, echo=FALSE, message=FALSE, warning=FALSE}
-
+```{r fig.align='right', fig.width=18, fig.height=11, out.width='100%', echo=FALSE, message=FALSE, warning=FALSE}
 df <- df %>% 
   mutate(price_class_numeric = case_when(
     price_class == "[0,150)" ~ 1,
@@ -181,33 +197,27 @@ df <- df %>%
     price_class == "[300,+)" ~ 3,
     TRUE ~ NA_real_
   ))
-
 # Step 1: Selection of numerical features
 numeric_features <- df %>%
   select(where(is.numeric)) %>%
   select(-price_class_numeric) %>% # Excluding the numerical version of the target variable
   select(-price) %>%
   select(-price_orig)
-
 # Step 2: Calculate the correlation of each numerical feature with the target variable
 target_correlations <- numeric_features %>%
   map_dbl(~ cor(., df$price_class_numeric, use = "complete.obs")) %>%
   abs() %>%  # Take absolute values and focus on strength of correlation rather than direction
   sort(decreasing = TRUE) %>%
   head(12)   # Select the 12 features with the highest relevance
-
-
 selected_features <- names(target_correlations)
-
 # Calculate the matrix of correlation coefficients between these features
 cor_matrix <- cor(numeric_features[selected_features], use = "complete.obs")
-
 # Visualisation of heat maps
 par(mar = c(0, 0, 0, 0) + 0.1) 
 corrplot(cor_matrix,
          method = "square",
          type = "upper",
-         tl.cex = 0.6,
+         tl.cex = 1.5,
          tl.col = "darkblue",
          tl.srt = 45,
          addCoef.col = "black",
@@ -216,10 +226,10 @@ corrplot(cor_matrix,
          col = colorRampPalette(c("blue", "white", "red"))(100),
         )
 
-title("Correlation Heatmap of Top 12 Numerical Features", 
-      line = -2, 
-      adj = 0,   
-      cex.main = 1.0)
+# title("Correlation Heatmap of Top 12 Numerical Features", 
+#       line = -2, 
+#       adj = 0,   
+#       cex.main = 1.0)
 ```
 </div>
 </div> 
@@ -228,7 +238,6 @@ Key Patterns:
 • Price ↑ as accommodation capacity ↑.  
 • Strong correlations among size-related features.  
 • Location variables less influential numerically.  
-
 ---
 class: incremental
 #5️⃣ Models Used & Why
