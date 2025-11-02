@@ -1536,6 +1536,7 @@ The confusion matrix is visualized as a heatmap to facilitate interpretation of 
 ### Cross-Validation Performance Distribution
 The distribution of performance metrics across folds is visualized using boxplots. Red diamonds indicate mean values, while boxes show the interquartile range. This visualization reveals the stability and variability of model performance.
 ```{r, message=FALSE, warning=FALSE, fig.align='center', fig.show='hold', out.width='40%'}
+library(patchwork)
 # Prepare data for visualization
 cm_df <- as.data.frame(cm_aggregated$table)
 names(cm_df) <- c("Prediction", "Reference", "Freq")
@@ -1552,7 +1553,7 @@ p1 <- ggplot(cm_df, aes(x = Prediction, y = Reference, fill = Freq)) +
         plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5))
 
-print(p1)
+#print(p1)
 
 # Prepare data for visualization
 cv_long <- cv_results %>%
@@ -1574,7 +1575,8 @@ p2 <- ggplot(cv_long, aes(x = metric, y = value, fill = metric)) +
         plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5))
 
-print(p2)
+#print(p2)
+p1 + p2
 ```
 
 
