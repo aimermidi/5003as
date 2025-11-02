@@ -683,7 +683,7 @@ The analysis begins by loading the cleaned dataset from previous preprocessing s
 df <- read.csv("cleaned_data_with_price_class_no_dislocation.csv", 
                encoding = "latin1")
 
-cat("Original dimensions:", nrow(df), "rows ×", ncol(df), "columns\n")
+
 
 # Remove invalid rows and normalize target labels (keep original style)
 df <- df %>%
@@ -700,8 +700,9 @@ df <- df %>%
   ) %>%
   tidyr::drop_na(price_class)
 
-# optional: check levels
-print(levels(df$price_class))
+
+cat("Original dimensions:", nrow(df), "rows ×", ncol(df), "columns\n",
+    "Price class levels:", paste(levels(df$price_class), collapse = ", "), "\n")
 ```
 
 ### Feature Selection Strategy
@@ -1030,12 +1031,16 @@ lda_f1   <- yardstick::f_meas(lda_results, truth = truth, estimate = estimate, e
 lda_mcc  <- mcc_macro(lda_results$truth, lda_results$estimate)
 
 # Print summary
-cat("\nLDA MODEL PERFORMANCE SUMMARY:\n")
-cat(sprintf("  Accuracy:  %.4f\n", lda_acc))
-cat(sprintf("  Precision (Macro): %.4f\n", lda_prec))
-cat(sprintf("  Recall (Macro):    %.4f\n", lda_rec))
-cat(sprintf("  F1 Score (Macro):  %.4f\n", lda_f1))
-cat(sprintf("  MCC:               %.4f\n", lda_mcc))
+cat("
+LDA MODEL PERFORMANCE SUMMARY:
+------------------------------
+Accuracy:           ", sprintf("%.4f", lda_acc), "\n",
+"Precision (Macro):  ", sprintf("%.4f", lda_prec), "\n",
+"Recall (Macro):     ", sprintf("%.4f", lda_rec), "\n",
+"F1 Score (Macro):   ", sprintf("%.4f", lda_f1), "\n",
+"MCC:                ", sprintf("%.4f", lda_mcc), "\n",
+sep = "")
+
 ```
 
 Then we got the result of LDA with a visualized plot, which shows the relation between LD1 and LD2, regarding to the 'price_class'. The detailed evaluation of LDA will be discussed later in the chapter of 'Performance Evaluation'. Next, let's dive into the implementation of KNN.
@@ -1284,7 +1289,7 @@ df_clean$price_class <- factor(df_clean$price_class,
 
 df_clean <- df_clean[!is.na(df_clean$price_class), ]
 
-cat("\n✅ Class distribution:\n")
+#cat("\n✅ Class distribution:\n")
 #print(table(df_clean$price_class))
 
 # --- 3. Remove leakage columns ---
@@ -1370,7 +1375,7 @@ fold_summary <- character()
 
 
 
-# --- 6. Cross-validation loop (修正版) ---
+# --- 6. Cross-validation loop  ---
 for (i in seq_along(folds)) {
   test_idx <- folds[[i]]
   train_idx <- setdiff(seq_len(nrow(df_clean)), test_idx)
@@ -1418,8 +1423,7 @@ for (i in seq_along(folds)) {
 }
 
 #cat("\n5-fold cross-validation completed.\n")
-kable(rf_fold_metrics, caption = "5-Fold Cross Validation Results for Random Forest",
-      digits = 4)
+#kable(rf_fold_metrics, caption = "5-Fold Cross Validation Results for Random Forest",digits = 4)
 
 # --- 7. Results summary ---
 summ <- rf_fold_metrics |>
@@ -1429,8 +1433,8 @@ summ <- rf_fold_metrics |>
     
   )
 
-cat("\n📊 Performance Metrics (Mean ± SD):\n")
-print(summ)
+#cat("\n📊 Performance Metrics (Mean ± SD):\n")
+#print(summ)
 
 # --- 8. Aggregated confusion matrix ---
 label_map <- c("low" = "[0,150)", "mid" = "[150,300)", "high" = "[300,+)")
@@ -1438,9 +1442,9 @@ all_pred  <- factor(unlist(rf_fold_preds), levels = names(label_map), labels = l
 all_truth <- factor(unlist(rf_fold_truth), levels = names(label_map), labels = label_map)
 
 cm <- confusionMatrix(all_pred, all_truth)
-cat("\nAggregated Confusion Matrix:\n")
+#cat("\nAggregated Confusion Matrix:\n")
 #print(cm$table)
-cat(sprintf("\nOverall Accuracy: %.4f\n", mean(all_pred == all_truth)))
+#cat(sprintf("\nOverall Accuracy: %.4f\n", mean(all_pred == all_truth)))
 
 # --- 9. Feature importance ---
 rf_full <- ranger(
