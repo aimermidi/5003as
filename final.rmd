@@ -1180,14 +1180,14 @@ set.seed(123)
 # --- 1. split dataset ---
 df_filtered$price_class <- factor(df_filtered$price_class)
 index <- createDataPartition(df_filtered$price_class, p = 0.75, list = FALSE)
-train <- df_filtered[index, ]
-test  <- df_filtered[-index, ]
+svm_train <- df_filtered[index, ]
+svm_test  <- df_filtered[-index, ]
 
 # --- 2. remain dependent variables and independent variables ---
 vars <- c("accommodates", "bedrooms", "beds", "room_type", "neighbourhood_cleansed", "price_class")
-train <- train[, vars]
-test  <- test[, vars]
-head(train)
+svm_train <- svm_train[, vars]
+svm_test  <- svm_test[, vars]
+head(svm_train)
 
 
 
@@ -1199,15 +1199,15 @@ The final model was then trained on the full training set with the best (C, γ) 
 ```{r, message=FALSE, warning=FALSE, results='hide'}
 
 # --- 3. make sure no missing value ---
-train <- na.omit(train)
-test  <- na.omit(test)
+svm_train <- na.omit(svm_train)
+svm_test  <- na.omit(svm_test)
 
 # --- 4. room_type and neighbourhood_cleansed  ---
-train$room_type <- as.factor(train$room_type)
-test$room_type  <- factor(test$room_type, levels = levels(train$room_type))
+svm_train$room_type <- as.factor(svm_train$room_type)
+svm_test$room_type  <- factor(svm_test$room_type, levels = levels(svm_train$room_type))
 
-train$neighbourhood_cleansed <- as.factor(train$neighbourhood_cleansed)
-test$neighbourhood_cleansed  <- factor(test$neighbourhood_cleansed, levels = levels(train$neighbourhood_cleansed))
+svm_train$neighbourhood_cleansed <- as.factor(svm_train$neighbourhood_cleansed)
+svm_test$neighbourhood_cleansed  <- factor(svm_test$neighbourhood_cleansed, levels = levels(svm_train$neighbourhood_cleansed))
 
 
 ```
@@ -1217,7 +1217,7 @@ test$neighbourhood_cleansed  <- factor(test$neighbourhood_cleansed, levels = lev
 tuned <- tune(
   svm,
   price_class ~ .,
-  data = train,
+  data = svm_train,
   kernel = "radial",
   ranges = list(cost = c(0.1, 1, 10), gamma = c(0.01, 0.1, 1)),
   tunecontrol = tune.control(cross = 3)
@@ -1231,7 +1231,7 @@ tuned <- tune(
 # --- 6. output optimal parameters ---
 best_model <- svm(
   price_class ~ .,
-  data = train,
+  data = svm_train,
   kernel = "radial",
   cost = 1,
   gamma = 1
@@ -1239,7 +1239,7 @@ best_model <- svm(
 
 
 # --- 7. predict ---
-svm_pred<- predict(best_model, newdata = test)
+svm_pred<- predict(best_model, newdata = svm_test)
 ```
 
 
@@ -1457,7 +1457,8 @@ top_imp <- tibble(Feature = names(imp)[1:min(20, length(imp))],
 cat("\n🏆 Top 20 Feature Importances:\n")
 print(top_imp)
 
-
+rf_cls <- factor(unlist(rf_fold_preds), levels = levels(df_clean$price_class))
+rf_test_df <- data.frame(price_class = unlist(rf_fold_truth))
 
 ```
 
@@ -1795,18 +1796,18 @@ conflicts_prefer(yardstick::precision)
 
 # yardstick 
 res <- tibble(
-  truth = test$price_class,
-  .pred_class = factor(svm_pred, levels = levels(test$price_class))
+  truth = svm_test$price_class,
+  .pred_class = factor(svm_pred, levels = levels(svm_test$price_class))
 )
 
-acc   <- accuracy(res, truth, .pred_class)
-prec  <- precision(res, truth, .pred_class, estimator = "macro")
-rec   <- yardstick::recall(res, truth, .pred_class, estimator = "macro")
-f1    <- f_meas(res, truth, .pred_class, estimator = "macro")
+svm_acc   <- accuracy(res, truth, .pred_class)
+svm_prec  <- precision(res, truth, .pred_class, estimator = "macro")
+svm_rec   <- yardstick::recall(res, truth, .pred_class, estimator = "macro")
+svm_f1    <- f_meas(res, truth, .pred_class, estimator = "macro")
 
 metrics_table <- tibble(
   Metric = c("Accuracy", "Precision (Macro)", "Recall (Macro)", "F1-Score (Macro)"),
-  Value  = c(acc$.estimate, prec$.estimate, rec$.estimate, f1$.estimate)
+  Value  = c(svm_acc$.estimate, svm_prec$.estimate, svm_rec$.estimate, svm_f1$.estimate)
 )
 
 metrics_table
@@ -1820,7 +1821,7 @@ metrics_table
 library(caret)
 library(ggplot2)
 
-cm <- confusionMatrix(svm_pred, test$price_class)
+cm <- confusionMatrix(svm_pred, svm_test$price_class)
 
 cm$table
 
@@ -1887,13 +1888,19 @@ library(knitr)
 library(kableExtra)
 library(yardstick)
 
+suppressMessages({
+  conflicted::conflicts_prefer(yardstick::precision)
+  conflicted::conflicts_prefer(yardstick::recall)
+  conflicted::conflicts_prefer(yardstick::f_meas)
+})
+
 # Calculate key metrics (macro-averaged)
 rf_results <- tibble(
-  truth = test$price_class,
-  estimate = rf_pred
+  truth = rf_test_df$price_class,
+  estimate = rf_cls 
 )
 
-rf_acc  <- confusionMatrix(rf_pred, test$price_class)$overall["Accuracy"]
+rf_acc  <- confusionMatrix(rf_cls , rf_test_df$price_class)$overall["Accuracy"]
 rf_prec <- precision(rf_results, truth, estimate, estimator = "macro")
 rf_rec  <- recall(rf_results, truth, estimate, estimator = "macro")
 rf_f1   <- f_meas(rf_results, truth, estimate, estimator = "macro")
@@ -1971,13 +1978,35 @@ knn_rec <- mean(sapply(levels(test_filtered$price_class), function(l) {
 }))
 
 
-
+knn_f1 <- mean(sapply(levels(test_filtered$price_class), function(l) {
+  tp <- sum(knn_test_pred == l & test_filtered$price_class == l)
+  fp <- sum(knn_test_pred == l & test_filtered$price_class != l)
+  fn <- sum(knn_test_pred != l & test_filtered$price_class == l)
+  
+  prec <- ifelse(tp + fp == 0, 0, tp / (tp + fp))
+  rec  <- ifelse(tp + fn == 0, 0, tp / (tp + fn))
+  
+  if ((prec + rec) == 0) 0 else 2 * prec * rec / (prec + rec)
+}))
 
 
 ```
 
 
 ```{r}
+lda_acc  <- as.numeric(lda_acc)
+
+rf_acc   <- as.numeric(rf_acc)
+
+rf_prec <- as.numeric(precision(rf_results, truth, estimate, estimator = "macro")$.estimate[1])
+rf_rec  <- as.numeric(recall(rf_results, truth, estimate, estimator = "macro")$.estimate[1])
+rf_f1   <- as.numeric(f_meas(rf_results, truth, estimate, estimator = "macro")$.estimate[1])
+
+svm_prec <- as.numeric(svm_prec)
+svm_rec  <- as.numeric(svm_rec)
+svm_f1   <- as.numeric(svm_f1)
+svm_acc <- as.numeric(confusionMatrix(svm_pred, svm_test$price_class)$overall["Accuracy"][1])
+
 # ==== Build comparison_df safely ====
 comparison_df <- base::data.frame(
   Model = c("Softmax Regression", "LDA", "kNN", "SVM (RBF)", "Random Forest"),
@@ -2012,22 +2041,44 @@ comparison_df <- base::data.frame(
   stringsAsFactors = FALSE
 )
 
-print(comparison_df)
+# === Format numeric columns ===
+comparison_df[, 2:5] <- round(comparison_df[, 2:5], 4)
+
+# === Pretty print as table ===
+kable(
+  comparison_df,
+  caption = "Performance Comparison Across Models",
+  align = "c"
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
+  column_spec(1, bold = TRUE) %>%
+  add_header_above(c(" " = 1, "Performance Metrics" = 4))
 
 ```
-Across all five classification algorithms — Softmax Regression, Linear Discriminant Analysis (LDA), k-Nearest Neighbors (kNN), Support Vector Machine (SVM with RBF kernel), and Random Forest — distinct trade-offs emerge between predictive accuracy, stability, and generalization.
 
-Softmax Regression achieves the highest overall accuracy (0.918) and F1 score (0.920), indicating that the linear decision boundaries it learns are sufficient to capture most of the class separability present in the transformed feature space. Its balanced precision and recall (both around 0.92) suggest consistent performance across all price classes.
 
-LDA shows notably lower accuracy (0.598) and F1 score (0.595), reflecting the limitations of its Gaussian and equal-covariance assumptions in this dataset. Nevertheless, its relatively balanced precision (0.625) and recall (0.582) confirm that it still captures meaningful linear structure and remains interpretable.
 
-The kNN model performs reasonably well (Accuracy = 0.708, F1 = 0.709), balancing bias and variance through local voting. Its macro precision (0.728) and recall (0.700) indicate slightly stronger discriminative ability for certain classes but some sensitivity to sample density variations.
 
-SVM with an RBF kernel yields comparable results (Accuracy = 0.701, F1 = 0.704), showing robustness to nonlinear class boundaries. It achieves balanced precision and recall (~0.71 / 0.69), suggesting effective separation without overfitting.
 
-In contrast, Random Forest underperforms on this dataset (Accuracy = 0.357, F1 = 0.345). The low metrics likely stem from class imbalance or overpartitioning in high-dimensional sparse features, which may lead to under-generalization.
 
-Overall, Softmax Regression and SVM exhibit the most reliable balance between accuracy and interpretability, while LDA provides valuable linear interpretability despite its reduced predictive strength. kNN maintains reasonable robustness, whereas Random Forest may require further tuning (e.g., tree depth or feature subsampling) to improve consistency.
+
+Across all five classification algorithms — Softmax Regression, Linear Discriminant Analysis (LDA), k-Nearest Neighbors (kNN), Support Vector Machine (SVM with RBF kernel), and Random Forest — distinct trade-offs emerge between predictive accuracy, generalization ability, and interpretability.
+
+Softmax Regression achieves the highest overall performance, with Accuracy = 0.918 and F1 = 0.919. Its balanced Precision (0.920) and Recall (0.919) indicate stable classification across all price tiers. This suggests that the linear decision boundaries it learns are sufficient to capture the primary structure in the data, making it both effective and interpretable.
+
+LDA performs moderately, with Accuracy = 0.598 and F1 = 0.595, consistent with its simplifying Gaussian and equal-covariance assumptions. Its Precision (0.625) and Recall (0.582) remain relatively balanced, suggesting that it still identifies meaningful linear separations despite reduced flexibility compared to nonlinear models.
+
+kNN yields Accuracy = 0.708 and F1 = 0.709, striking a reasonable balance between local adaptivity and noise sensitivity. Its Precision (0.728) and Recall (0.700) indicate that it captures neighborhood-based structure effectively, though performance can vary with data density.
+
+SVM (RBF) performs comparably with Accuracy = 0.701 and F1 = 0.704. The Precision (0.720) and Recall (0.694) values imply solid boundary discrimination and moderate generalization. This model benefits from nonlinear flexibility but may require tuning of kernel parameters for further gains.
+
+Random Forest shows strong improvement compared to earlier runs, achieving Accuracy = 0.802 and F1 = 0.805. Its Precision (0.820) and Recall (0.797) reflect robust ensemble learning and better handling of nonlinearity and mixed data types. This suggests it generalizes well while remaining resilient to outliers.
+
+Overall, Softmax Regression still delivers the most consistent and interpretable results, while Random Forest demonstrates powerful generalization with nonlinear interactions. kNN and SVM (RBF) achieve competitive middle-ground performance, and LDA offers a simple yet informative linear baseline.
 
 
 # Conclusion
