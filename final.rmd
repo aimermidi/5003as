@@ -488,12 +488,14 @@ After executing the above code, we first removed irrelevant columns to simplify 
 
 # Exploratory Data Analysis (EDA)
 
-## Distribution of the Target Variable
+### Distribution of the Target Variable
 The target variable price_class is divided into three ranges: low [0,150), medium [150,300), and high [300,+). As shown in the bar chart, the medium price category contains the largest number of listings, with more than 6,500 entries. The low and high price categories are close in size, each with around 4,500 listings. This visualization provides an overview of how listings are distributed across price ranges, setting the stage for further analysis in subsequent sections.
-## Categorical feature
-### Room Type vs. Price Class
+
+### Categorical feature
+##### Room Type vs. Price Class
 The distribution of room_type across price_class categories shows clear differences. Entire home/apt dominates the dataset, especially in the medium and high price ranges. Private rooms are mostly concentrated in the low-price category, while hotel rooms and shared rooms are rare and contribute minimally. This pattern highlights room type as a strong determinant of listing price, with full-property rentals generally commanding higher values.
-### Neighbourhood vs. Price Class 
+
+##### Neighbourhood vs. Price Class 
 The distribution of listings across the top 10 neighbourhoods shows notable variation in price categories. Sydney dominates the dataset, with a majority of listings in the medium and high price classes. In contrast, areas such as Randwick, and North Sydney present a more balanced mix of low- and mid-priced properties, while suburbs like Waverley and Manly display relatively higher proportions of high-price listings. These differences highlight the strong influence of location on pricing, confirming that neighbourhood is a key determinant of property value alongside room type.
 ```{r,fig.width=30, fig.height=12, out.width="90%", fig.align="center"}
 library(patchwork)
@@ -537,11 +539,11 @@ pic3 <- ggplot(df_subset, aes(x = neighbourhood_cleansed, fill = price_class)) +
 
 
 
-## Numerical feature
+### Numerical feature
 
 The feature accommodates was selected for exploratory analysis as it directly reflects a property’s capacity and is expected to influence price. Correlation analysis further showed that accommodates, bedrooms, and beds are strongly related and positively associated with price_class. Therefore, accommodates was selected as a representative feature to examine how property’s capacity contributes to price segmentation.
 
-### Accommodates vs. Price Class
+##### Accommodates vs. Price Class
 The distribution of accommodates is highly right-skewed, with most listings designed to host between 1 and 4 guests, indicating that smaller properties dominate the dataset.
 The boxplot comparison across price_class shows a clear increasing pattern: higher price categories generally correspond to listings that can accommodate more guests.
 The median capacity rises from around 2 in the lowest price class to about 6 in the highest, reflecting the intuitive link between property size and price level.
@@ -566,7 +568,7 @@ p2 <- ggplot(df, aes(x = price_class, y = accommodates, fill = price_class)) +
 p1 + p2  
 ```
 
-## Correlation Heatmap of Numerical Features 
+### Correlation Heatmap of Numerical Features 
 
 To improve readability and focus on the most relevant insights, we selected the top 12 numerical features most strongly correlated with the target variable price_class. This approach highlights the variables that are most likely to influence price segmentation while avoiding excessive visual clutter from weakly related features. The resulting heatmap provides a clear view of key relationships and helps identify potential multicollinearity among the most influential predictors.
 ```{r,out.width="70%", fig.align="center"}
@@ -621,7 +623,7 @@ title("Correlation Heatmap of Top 12 Numerical Features",
 ```
 The heatmap reveals strong positive correlations among accommodates, bedrooms, and beds, suggesting potential multicollinearity. Other numerical features show weaker correlations and may provide complementary information for modeling.
 
-## Class Imbalance Check
+### Class Imbalance Check
 
 We examined the distribution of the target variable (price_class) and two key categorical features (room_type, neighbourhood_cleansed).  
 Price Class: Moderately imbalanced, with most listings in the 150–300 range. All classes remain reasonably represented.  
