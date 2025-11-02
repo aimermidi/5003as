@@ -1286,7 +1286,7 @@ df_clean$price_class <- factor(df_clean$price_class,
 df_clean <- df_clean[!is.na(df_clean$price_class), ]
 
 cat("\n✅ Class distribution:\n")
-print(table(df_clean$price_class))
+#print(table(df_clean$price_class))
 
 # --- 3. Remove leakage columns ---
 leak_cols <- intersect(
@@ -1440,7 +1440,7 @@ all_truth <- factor(unlist(rf_fold_truth), levels = names(label_map), labels = l
 
 cm <- confusionMatrix(all_pred, all_truth)
 cat("\nAggregated Confusion Matrix:\n")
-print(cm$table)
+#print(cm$table)
 cat(sprintf("\nOverall Accuracy: %.4f\n", mean(all_pred == all_truth)))
 
 # --- 9. Feature importance ---
@@ -1454,8 +1454,8 @@ rf_full <- ranger(
 imp <- sort(rf_full$variable.importance, decreasing = TRUE)
 top_imp <- tibble(Feature = names(imp)[1:min(20, length(imp))],
                   Importance = as.numeric(imp[1:min(20, length(imp))]))
-cat("\n🏆 Top 20 Feature Importances:\n")
-print(top_imp)
+#cat("\n🏆 Top 20 Feature Importances:\n")
+#print(top_imp)
 
 rf_cls <- factor(unlist(rf_fold_preds), levels = levels(df_clean$price_class))
 rf_test_df <- data.frame(price_class = unlist(rf_fold_truth))
@@ -1533,7 +1533,9 @@ print(round(class_metrics, 4))
 ## Confusion Matrix Visualization
 The confusion matrix is visualized as a heatmap to facilitate interpretation of classification patterns. Cell colors indicate prediction frequencies, with darker shades representing higher counts.
 
-```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=6}
+### Cross-Validation Performance Distribution
+The distribution of performance metrics across folds is visualized using boxplots. Red diamonds indicate mean values, while boxes show the interquartile range. This visualization reveals the stability and variability of model performance.
+```{r, message=FALSE, warning=FALSE, fig.align='center', fig.show='hold', out.width='40%'}
 # Prepare data for visualization
 cm_df <- as.data.frame(cm_aggregated$table)
 names(cm_df) <- c("Prediction", "Reference", "Freq")
@@ -1551,12 +1553,7 @@ p1 <- ggplot(cm_df, aes(x = Prediction, y = Reference, fill = Freq)) +
         plot.subtitle = element_text(hjust = 0.5))
 
 print(p1)
-```
 
-### Cross-Validation Performance Distribution
-The distribution of performance metrics across folds is visualized using boxplots. Red diamonds indicate mean values, while boxes show the interquartile range. This visualization reveals the stability and variability of model performance.
-
-```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
 # Prepare data for visualization
 cv_long <- cv_results %>%
   select(fold, accuracy, macro_f1, mcc, macro_auc) %>%
@@ -1580,10 +1577,16 @@ p2 <- ggplot(cv_long, aes(x = metric, y = value, fill = metric)) +
 print(p2)
 ```
 
+
+
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+```
+
 ### Feature Importance Analysis
 Feature importance is assessed by computing the average absolute coefficient magnitude across all price classes. Higher values indicate features that have stronger influence on price classification. The top 20 most important features are visualized to identify key predictors.
 
-```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=8}
+```{r, message=FALSE, warning=FALSE, fig.align='center', fig.show='hold', out.width='40%'}
 # Train a final model on all data for feature importance extraction
 set.seed(42)
 train_idx <- createDataPartition(df$price_class, p = 0.8, list = FALSE)
@@ -1674,7 +1677,7 @@ cat("\n", rep("=", 70), "\n")
 ```
 
 ## Linear Discriminant Analysis (LDA)
-```{r, message=FALSE, warning=FALSE, results='hide'}
+```{r, message=FALSE, warning=FALSE, results='hide', fig.align='center', fig.show='hold', out.width='40%'}
 library(readr)
 library(dplyr)
 library(tidyr)
@@ -1732,7 +1735,7 @@ LDA with `room_type` and `neighbourhood_cleansed` captures meaningful signal and
 After tuning the neighborhood size (k = 27), the final kNN model was evaluated on a 20% independent test set. 
 The results show that the overall accuracy of the model is 0.7079, that is, about 71% of listings are correctly classified into the corresponding price range. 
 The macro-weighted F1 score (0.7087) and MCC (0.5507) also show that the model's performance in three price categories was relatively stable, maintaining a good balance between precision and recall rate.
-```{r}
+```{r ig.align='center', fig.show='hold', out.width='40%'}
 # 1. Independent test set evaluation
 
 knn_test_pred <- predict(best_knn, newdata = test_filtered)
@@ -1817,7 +1820,7 @@ metrics_table
 
 ```
 
-```{r}
+```{r ig.align='center', fig.show='hold', out.width='40%'}
 library(caret)
 library(ggplot2)
 
@@ -1845,7 +1848,7 @@ ggplot(cm_df, aes(x = Reference, y = Prediction, fill = Freq)) +
 
 
 ## Random Forest
-```{r}
+```{r ig.align='center', fig.show='hold', out.width='45%'}
 # --- 10. Visualizations ---
 
 library(ggplot2)
@@ -1998,10 +2001,7 @@ knn_f1 <- mean(sapply(levels(test_filtered$price_class), function(l) {
 
 
 ```
-```{r}
-lengths(list(Model, Accuracy, Precision, Recall))
 
-```
 
 
 ```{r}
