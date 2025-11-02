@@ -108,8 +108,8 @@ These observations highlight both the richness and the challenges of the dataset
 We first preprocess the target column price by removing all non-numeric characters, converting price to numeric type, and removing observations with price ≤ 0. We also use IQR for outlier analysis.
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
-
-# Read in the original data (all in character format to avoid misinterpretation of "price")
+library(corrplot)
+# Read in the original data (all ilibrary(corrplot)n character format to avoid misinterpretation of "price")
 df <- read_csv("listings.csv", col_types = cols(.default = "c"))
 ```
 **Step 1: Price Column Auto-Detection**
@@ -490,44 +490,36 @@ After executing the above code, we first removed irrelevant columns to simplify 
 
 ## Distribution of the Target Variable
 The target variable price_class is divided into three ranges: low [0,150), medium [150,300), and high [300,+). As shown in the bar chart, the medium price category contains the largest number of listings, with more than 6,500 entries. The low and high price categories are close in size, each with around 4,500 listings. This visualization provides an overview of how listings are distributed across price ranges, setting the stage for further analysis in subsequent sections.
-```{r,out.width="50%",fig.align="center",out.height="50%"}
+## Categorical feature
+### Room Type vs. Price Class
+The distribution of room_type across price_class categories shows clear differences. Entire home/apt dominates the dataset, especially in the medium and high price ranges. Private rooms are mostly concentrated in the low-price category, while hotel rooms and shared rooms are rare and contribute minimally. This pattern highlights room type as a strong determinant of listing price, with full-property rentals generally commanding higher values.
+### Neighbourhood vs. Price Class 
+The distribution of listings across the top 10 neighbourhoods shows notable variation in price categories. Sydney dominates the dataset, with a majority of listings in the medium and high price classes. In contrast, areas such as Randwick, and North Sydney present a more balanced mix of low- and mid-priced properties, while suburbs like Waverley and Manly display relatively higher proportions of high-price listings. These differences highlight the strong influence of location on pricing, confirming that neighbourhood is a key determinant of property value alongside room type.
+```{r,fig.width=30, fig.height=12, out.width="90%", fig.align="center"}
 library(patchwork)
-library(corrplot)
 library(ggplot2)
 library(tidyverse)
+
+# 
 df <- read.csv("cleaned_data_with_price_class_no_dislocation.csv", encoding = "latin1")
 
-# Use a bar chart to visualize the distribution of price_class.
-ggplot(df, aes(x = price_class)) +
+#  price_class 
+pic1 <- ggplot(df, aes(x = price_class)) +
   geom_bar(fill = "steelblue") +
   theme_minimal() +
   labs(title = "Distribution of Target Variable: price_class")
-```
 
-## Categorical feature
+#  room_type vs price_class
+pic2 <- ggplot(df, aes(x = room_type, fill = price_class)) +
+  geom_bar(position = "dodge") +
+  theme_minimal() +
+  labs(title = "Room Type vs Price Class")
 
-### Room Type vs. Price Class
-The distribution of room_type across price_class categories shows clear differences. Entire home/apt dominates the dataset, especially in the medium and high price ranges. Private rooms are mostly concentrated in the low-price category, while hotel rooms and shared rooms are rare and contribute minimally. This pattern highlights room type as a strong determinant of listing price, with full-property rentals generally commanding higher values.
-```{r,out.width="50%",fig.align="center"}
-# Room Type vs Price Class
-  ggplot(df, aes(x = room_type, fill = price_class)) +
-    geom_bar(position = "dodge") +
-    theme_minimal() +
-    labs(title = "Room Type vs Price Class")
-```
-
-### Neighbourhood vs. Price Class 
-The distribution of listings across the top 10 neighbourhoods shows notable variation in price categories. Sydney dominates the dataset, with a majority of listings in the medium and high price classes. In contrast, areas such as Randwick, and North Sydney present a more balanced mix of low- and mid-priced properties, while suburbs like Waverley and Manly display relatively higher proportions of high-price listings. These differences highlight the strong influence of location on pricing, confirming that neighbourhood is a key determinant of property value alongside room type.
-
-```{r,out.width="50%", fig.align="center"}
-# Step 1: Calculate the frequency and select the top ten
+#  Top 10 Neighbourhood vs price_class
 top_10 <- names(sort(table(df$neighbourhood_cleansed), decreasing = TRUE))[1:10]
-
-# Step 2: Filtering data
 df_subset <- df[df$neighbourhood_cleansed %in% top_10, ]
 
-# Step 3: Visualize
-ggplot(df_subset, aes(x = neighbourhood_cleansed, fill = price_class)) +
+pic3 <- ggplot(df_subset, aes(x = neighbourhood_cleansed, fill = price_class)) +
   geom_bar(position = "dodge") +
   labs(title = "Top 10 Neighbourhoods vs Price Class",
        x = "Neighbourhood",
@@ -535,7 +527,14 @@ ggplot(df_subset, aes(x = neighbourhood_cleansed, fill = price_class)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+(pic1 | pic2 | pic3) +
+  plot_layout(widths = c(1, 1, 1)) +
+  plot_annotation(
+    theme = theme(plot.margin = margin(10, 10, 10, 10))
+  )
+
 ```
+
 
 
 ## Numerical feature
@@ -1527,9 +1526,9 @@ print(cm_aggregated$table)
 cat("\nOverall Accuracy:", round(cm_aggregated$overall['Accuracy'], 4), "\n")
 
 # Display class-wise performance metrics
-cat("\nClass-wise Performance:\n")
+#cat("\nClass-wise Performance:\n")
 class_metrics <- cm_aggregated$byClass[, c("Sensitivity", "Specificity", "Precision", "F1")]
-print(round(class_metrics, 4))
+#print(round(class_metrics, 4))
 ```
 
 The confusion matrix reveals balanced performance across all three price classes, with each class achieving sensitivity and precision above 91%. Most misclassifications occur between adjacent price ranges (e.g., [0,150) vs. [150,300)), which is expected given the natural overlap near price boundaries. The class-wise F1 scores are all above 0.91, indicating consistent performance across low, medium, and high price categories.
@@ -1540,7 +1539,9 @@ The confusion matrix is visualized as a heatmap to facilitate interpretation of 
 ### Cross-Validation Performance Distribution
 The distribution of performance metrics across folds is visualized using boxplots. Red diamonds indicate mean values, while boxes show the interquartile range. This visualization reveals the stability and variability of model performance.
 
-```{r, message=FALSE, warning=FALSE,out.width='45%',fig.width=12}
+### Feature Importance Analysis
+Feature importance is assessed by computing the average absolute coefficient magnitude across all price classes. Higher values indicate features that have stronger influence on price classification. The top 20 most important features are visualized to identify key predictors.
+```{r, message=FALSE, warning=FALSE, fig.align='center', fig.width=24, fig.height=8, out.width='100%'}
 library(patchwork)
 # Prepare data for visualization
 cm_df <- as.data.frame(cm_aggregated$table)
@@ -1580,20 +1581,6 @@ p2 <- ggplot(cv_long, aes(x = metric, y = value, fill = metric)) +
         plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5))
 
-#print(p2)
-p1 + p2 + plot_layout(widths = c(1, 1))
-```
-
-
-
-```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
-
-```
-
-### Feature Importance Analysis
-Feature importance is assessed by computing the average absolute coefficient magnitude across all price classes. Higher values indicate features that have stronger influence on price classification. The top 20 most important features are visualized to identify key predictors.
-
-```{r, message=FALSE, warning=FALSE, fig.width=10, out.width=30%}
 # Train a final model on all data for feature importance extraction
 set.seed(42)
 train_idx <- createDataPartition(df$price_class, p = 0.8, list = FALSE)
@@ -1632,10 +1619,32 @@ p3 <- ggplot(importance_df, aes(x = reorder(feature, importance), y = importance
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5))
 
-print(p3)
+#print(p3)
 
-cat("\nTop 10 Most Important Features:\n")
-print(knitr::kable(head(importance_df, 10), digits = 4, row.names = FALSE))
+#cat("\nTop 10 Most Important Features:\n")
+#print(knitr::kable(head(importance_df, 10), digits = 4, row.names = FALSE))
+
+
+# Patchwork layout: 3 plots in one row
+(p1 | p2 | p3) +
+  plot_layout(widths = c(1.1, 1.1, 1)) +
+  plot_annotation(
+    theme = theme(
+      plot.margin = margin(30, 30, 30, 30)
+    )
+  ) &
+  theme(
+    text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5)
+  )
+```
+
+
+
+
+```{r, message=FALSE, warning=FALSE, fig.width=10}
+
 ```
 
 The feature importance analysis reveals that property capacity-related features (accommodates, bedrooms, beds) and location indicators (neighbourhood_cleansed) dominate the top predictors. These findings align with domain knowledge: property size and location are primary determinants of pricing. The one-hot encoded categorical features for room types and neighbourhoods also appear prominently, confirming their significance in price classification.

@@ -1,0 +1,86 @@
+```{r, message=FALSE, warning=FALSE,out.width='45%',fig.width=30,fig.height=10}
+library(patchwork)
+# Prepare data for visualization
+cm_df <- as.data.frame(cm_aggregated$table)
+names(cm_df) <- c("Prediction", "Reference", "Freq")
+
+# Create heatmap
+p1 <- ggplot(cm_df, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white", size = 1.5) +
+  geom_text(aes(label = Freq), size = 6, fontface = "bold") +
+  scale_fill_gradient(low = "#f0f0f0", high = "#2c7bb6") +
+  labs(title = "Confusion Matrix - Softmax Logistic Regression",
+       subtitle = "Aggregated from 5-Fold Cross-Validation") +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+#print(p1)
+
+# Prepare data for visualization
+cv_long <- cv_results %>%
+  select(fold, accuracy, macro_f1, mcc, macro_auc) %>%
+  pivot_longer(cols = -fold, names_to = "metric", values_to = "value")
+
+# Create boxplot
+p2 <- ggplot(cv_long, aes(x = metric, y = value, fill = metric)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5, size = 2) +
+  stat_summary(fun = mean, geom = "point", shape = 23, 
+               size = 3, fill = "red", color = "darkred") +
+  labs(title = "Cross-Validation Performance Distribution",
+       subtitle = "5-Fold Stratified CV (Red diamonds = Mean)",
+       x = "Metric", y = "Value") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 30, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Train a final model on all data for feature importance extraction
+set.seed(42)
+train_idx <- createDataPartition(df$price_class, p = 0.8, list = FALSE)
+train_raw <- df[train_idx, ]
+test_raw <- df[-train_idx, ]
+
+# Preprocess
+preprocessed <- preprocess_for_modeling(train_raw, test_raw, 
+                                        valid_numeric, key_categorical)
+
+# Train model
+train_data <- cbind(target = preprocessed$y_train, preprocessed$X_train)
+model_final <- multinom(target ~ ., data = train_data, 
+                        maxit = 200, trace = FALSE, MaxNWts = 10000)
+
+# Extract coefficients
+coef_matrix <- summary(model_final)$coefficients
+feature_names <- rownames(coef_matrix)
+feature_names <- feature_names[feature_names != "(Intercept)"]
+
+# Calculate average absolute coefficient across classes
+avg_abs_coef <- apply(abs(coef_matrix[feature_names, ]), 1, mean)
+importance_df <- data.frame(
+  feature = feature_names,
+  importance = avg_abs_coef
+) %>% arrange(desc(importance)) %>% head(20)
+
+# Create bar plot
+p3 <- ggplot(importance_df, aes(x = reorder(feature, importance), y = importance)) +
+  geom_col(fill = "#d95f02", alpha = 0.8) +
+  coord_flip() +
+  labs(title = "Top 20 Feature Importance",
+       subtitle = "Average |Coefficient| across Price Classes",
+       x = "Feature", y = "Importance") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+#print(p3)
+
+#cat("\nTop 10 Most Important Features:\n")
+#print(knitr::kable(head(importance_df, 10), digits = 4, row.names = FALSE))
+
+
+p1 + p2 + p3 + plot_layout(widths = c(1, 1))
+```
