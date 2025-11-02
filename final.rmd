@@ -1991,6 +1991,10 @@ knn_f1 <- mean(sapply(levels(test_filtered$price_class), function(l) {
 
 
 ```
+```{r}
+lengths(list(Model, Accuracy, Precision, Recall))
+
+```
 
 
 ```{r}
