@@ -6,7 +6,7 @@ author: |
 date: "`r Sys.Date()`"
 output:
   html_document:
-    toc: true
+    toc: false
     toc_depth: 3
     theme: readable
     code_folding: hide 
@@ -21,7 +21,7 @@ h1.title, h4.author, h4.date {
 }
 
 body {
-  font-size: 10px;   
+  font-size: 8px;   
   line-height: 1.5;
 }
 
@@ -33,13 +33,13 @@ pre, code, kbd, samp {
 
 <style>
 h1 {
-  font-size: 24px;
-}
-h2 {
   font-size: 20px;
 }
-h3 {
+h2 {
   font-size: 18px;
+}
+h3 {
+  font-size: 16px;
 }
 h1.title, h4.author, h4.date { text-align: center; }
 .r-output, .r-message, .r-warning {
